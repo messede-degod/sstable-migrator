@@ -12,11 +12,18 @@ import java.io.IOException;
 import java.io.BufferedReader;
 import java.io.FileReader;
 
+import com.maxmind.db.MaxMindDbConstructor;
+import com.maxmind.db.MaxMindDbParameter;
+import com.maxmind.db.Reader;
+import java.net.InetAddress;
+
 public class App {
 
     CQLSSTableWriter writer;
+    Reader MMDBReader;
     int processedEntries = 0;
     int processedFiles = 0;
+    int lookedUpEntries = 0;
 
     public static void main(String[] args) throws IOException {
 
@@ -60,6 +67,7 @@ public class App {
         System.out.println("Writer closed Successfully");
         System.out.println("Processed " + csw.processedEntries + " Entries");
         System.out.println("Processed " + csw.processedFiles + " Files");
+        System.out.println("LookedUp " + csw.lookedUpEntries + " Records");
 
     }
 
@@ -75,8 +83,10 @@ public class App {
                 + " ipAddress VARCHAR,"
                 + " country VARCHAR,"
                 + " city  VARCHAR,"
+                + " asn   VARCHAR,"
+                + " as_name VARCHAR,"
                 + " PRIMARY KEY (ipAddress,apexDomain) );";
-        
+
         String insert = "INSERT INTO ferret.dnsdata (apexDomain, recordType, subDomain, ipAddress, country, city) VALUES (?, ?, ?, ?, ?, ?)";
 
         File directory = new File(keyspace);
@@ -93,8 +103,15 @@ public class App {
                 .forTable(schema)
                 .using(insert).build();
 
-
         System.out.println("Writer created Successfully");
+
+        File database = new File("misc/country_asn.mmdb");
+
+        try {
+            this.MMDBReader = new Reader(database);
+        } catch (IOException e) {
+            System.out.println("Error OPening MMDB :: " + e.toString());
+        }
     }
 
     public void parseAndInsert(String jsonString) throws IOException, SkippedEntryProcessingException {
@@ -111,7 +128,10 @@ public class App {
             String recordType = ans.getString("type");
             String country = "";
             String city = "";
+            String asn = "";
+            String as_name = "";
 
+            // Read the default Geo Data from DP DB
             try {
                 JSONObject geo = ans.getJSONObject("geoIP");
                 country = geo.getString("Country");
@@ -120,8 +140,20 @@ public class App {
                 continue;
             }
 
+            // Lookup GEO and ASN Details using MMDB;
+            if (recordType.equals("a")) {
+                InetAddress parsedIpAddress = InetAddress.getByName(ip);
+                LookupResult result = this.MMDBReader.get(parsedIpAddress, LookupResult.class);
+                if (result != null) {
+                    country = result.country;
+                    asn = result.asn;
+                    as_name = result.as_name;
+                }
+                this.lookedUpEntries += 1;
+            }
+
             if (ip != "" && ip != null && apexDomain != "" && apexDomain != null) {
-                this.writeRecord(apexDomain, recordType, subdomain, ip, country, city);
+                this.writeRecord(apexDomain, recordType, subdomain, ip, country, city, asn, as_name);
             } else {
                 System.out.println("ip or apexDomain empty!, ignoring record: <" + ip + ", " + apexDomain + ">");
             }
@@ -130,10 +162,10 @@ public class App {
     }
 
     public void writeRecord(String apexDomain, String recordType, String subDomain, String ipAddress, String country,
-            String city)
+            String city, String asn, String as_name)
             throws IOException, SkippedEntryProcessingException {
         try {
-            this.writer.addRow(apexDomain, recordType, subDomain, ipAddress, country, city);
+            this.writer.addRow(apexDomain, recordType, subDomain, ipAddress, country, city, asn, as_name);
             this.processedEntries++;
         } catch (InvalidRequestException ie) {
             System.out.println("InvalidRequestException: faile to write entry <" + apexDomain + "," + recordType + ","
@@ -150,4 +182,19 @@ public class App {
         }
     }
 
+    public static class LookupResult {
+        public final String country;
+        public final String asn;
+        public final String as_name;
+
+        @MaxMindDbConstructor
+        public LookupResult(
+                @MaxMindDbParameter(name = "country") String country,
+                @MaxMindDbParameter(name = "asn") String asn,
+                @MaxMindDbParameter(name = "as_name") String as_name) {
+            this.country = country;
+            this.asn = asn;
+            this.as_name = as_name;
+        }
+    }
 }
