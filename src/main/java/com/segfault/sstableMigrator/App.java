@@ -5,6 +5,7 @@ import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.io.sstable.CQLSSTableWriter;
 import org.json.JSONObject;
 import org.json.JSONArray;
+import org.json.JSONException;
 
 import java.io.File;
 import java.io.IOException;
@@ -72,9 +73,11 @@ public class App {
                 + " recordType VARCHAR,"
                 + " subDomain VARCHAR,"
                 + " ipAddress VARCHAR,"
-                + " PRIMARY KEY (ipAddress,apexDomain) )";
-
-        String insert = "INSERT INTO ferret.dnsdata (apexDomain, recordType, subDomain, ipAddress) VALUES (?, ?, ?,?)";
+                + " country VARCHAR,"
+                + " city  VARCHAR,"
+                + " PRIMARY KEY (ipAddress,apexDomain) );";
+        
+        String insert = "INSERT INTO ferret.dnsdata (apexDomain, recordType, subDomain, ipAddress, country, city) VALUES (?, ?, ?, ?, ?, ?)";
 
         File directory = new File(keyspace);
         if (!directory.exists())
@@ -89,6 +92,7 @@ public class App {
                 .inDirectory(outputDir)
                 .forTable(schema)
                 .using(insert).build();
+
 
         System.out.println("Writer created Successfully");
     }
@@ -105,9 +109,19 @@ public class App {
             String subdomain = ans.getString("name");
             String ip = ans.getString("data");
             String recordType = ans.getString("type");
+            String country = "";
+            String city = "";
+
+            try {
+                JSONObject geo = ans.getJSONObject("geoIP");
+                country = geo.getString("Country");
+                city = geo.getString("City");
+            } catch (JSONException e) {
+                continue;
+            }
 
             if (ip != "" && ip != null && apexDomain != "" && apexDomain != null) {
-                this.writeRecord(apexDomain, recordType, subdomain, ip);
+                this.writeRecord(apexDomain, recordType, subdomain, ip, country, city);
             } else {
                 System.out.println("ip or apexDomain empty!, ignoring record: <" + ip + ", " + apexDomain + ">");
             }
@@ -115,10 +129,11 @@ public class App {
 
     }
 
-    public void writeRecord(String apexDomain, String recordType, String subDomain, String ipAddress)
+    public void writeRecord(String apexDomain, String recordType, String subDomain, String ipAddress, String country,
+            String city)
             throws IOException, SkippedEntryProcessingException {
         try {
-            this.writer.addRow(apexDomain, recordType, subDomain, ipAddress);
+            this.writer.addRow(apexDomain, recordType, subDomain, ipAddress, country, city);
             this.processedEntries++;
         } catch (InvalidRequestException ie) {
             System.out.println("InvalidRequestException: faile to write entry <" + apexDomain + "," + recordType + ","
