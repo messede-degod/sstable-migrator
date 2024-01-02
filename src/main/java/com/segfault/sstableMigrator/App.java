@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.io.BufferedReader;
 import java.io.FileReader;
 
+import com.maxmind.db.CHMCache;
 import com.maxmind.db.MaxMindDbConstructor;
 import com.maxmind.db.MaxMindDbParameter;
 import com.maxmind.db.Reader;
@@ -64,6 +65,7 @@ public class App {
         System.out.println("Finished processing all files.");
 
         csw.writer.close();
+        csw.MMDBReader.close();
         System.out.println("Writer closed Successfully");
         System.out.println("Processed " + csw.processedEntries + " Entries");
         System.out.println("Processed " + csw.processedFiles + " Files");
@@ -108,7 +110,7 @@ public class App {
         File database = new File("misc/country_asn.mmdb");
 
         try {
-            this.MMDBReader = new Reader(database);
+            this.MMDBReader = new Reader(database,new CHMCache());
         } catch (IOException e) {
             System.out.println("Error OPening MMDB :: " + e.toString());
         }
@@ -150,6 +152,8 @@ public class App {
                     as_name = result.as_name;
                 }
                 this.lookedUpEntries += 1;
+                result = null;
+
             }
 
             if (ip != "" && ip != null && apexDomain != "" && apexDomain != null) {
