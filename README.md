@@ -9,7 +9,7 @@
  - Start Container - `sudo docker run -v ./output/:/ferret/dnsdata  -d --name cassandra --hostname cassandra --network cassandra cassandra` (Allow upto a minute for bootup)
  - Start a cqlsh shell - `sudo docker exec -it cassandra cqlsh`
  - Create Keyspace - `CREATE KEYSPACE ferret WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'};`
- - Create Table - `CREATE TABLE ferret.dnsdata (apexDomain VARCHAR,recordType VARCHAR, subDomain VARCHAR, ipAddress VARCHAR, PRIMARY KEY (ipAddress,apexDomain) );`
+ - Create Table - `CREATE TABLE ferret.dnsdata (apexDomain VARCHAR,recordType VARCHAR, subDomain VARCHAR, ipAddress VARCHAR, country VARCHAR, city VARCHAR, asn VARCHAR, as_name VARCHAR, PRIMARY KEY (ipAddress,apexDomain) );`
  - Move Data - `sudo docker container exec -it cassandra  sstableloader -d 172.18.0.2 /ferret/dnsdata/`
 
 # Possible Improvements

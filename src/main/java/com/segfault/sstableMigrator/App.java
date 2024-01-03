@@ -89,7 +89,7 @@ public class App {
                 + " as_name VARCHAR,"
                 + " PRIMARY KEY (ipAddress,apexDomain) );";
 
-        String insert = "INSERT INTO ferret.dnsdata (apexDomain, recordType, subDomain, ipAddress, country, city) VALUES (?, ?, ?, ?, ?, ?)";
+        String insert = "INSERT INTO ferret.dnsdata (apexDomain, recordType, subDomain, ipAddress, country, city, asn, as_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
         File directory = new File(keyspace);
         if (!directory.exists())
