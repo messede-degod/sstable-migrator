@@ -110,7 +110,7 @@ public class App {
         File database = new File("misc/country_asn.mmdb");
 
         try {
-            this.MMDBReader = new Reader(database,new CHMCache(262144));
+            this.MMDBReader = new Reader(database, new CHMCache(262144));
         } catch (IOException e) {
             System.out.println("Error OPening MMDB :: " + e.toString());
         }
@@ -142,18 +142,21 @@ public class App {
                 continue;
             }
 
-            // Handle CNAMES properly
-            apexDomain = ipStr;
-            ipStr = "0.0.0.0";
+            Boolean isARecord = recordType.equals("a");
+
+            if (!isARecord) {
+                // Handle CNAME's properly
+                apexDomain = ipStr;
+                ipStr = "0.0.0.0";
+            }
+
             InetAddress parsedIpAddress = InetAddress.getByName(ipStr);
 
             // Lookup GEO and ASN Details using MMDB;
-            if (recordType.equals("a")) {
+            if(isARecord) {
                 LookupResult result = this.MMDBReader.get(parsedIpAddress, LookupResult.class);
                 if (result != null) {
                     country = result.country;
-                    // String asnStr = result.asn.substring(2); // REMOVE AS from string
-                    // asn = Integer.parseInt(asnStr);
                     asn = result.asn;
                     as_name = result.as_name;
                 }
@@ -162,7 +165,7 @@ public class App {
 
             }
 
-            if ( apexDomain != "" && apexDomain != null) {
+            if (apexDomain != "" && apexDomain != null) {
                 this.writeRecord(apexDomain, recordType, subdomain, parsedIpAddress, country, city, asn, as_name);
             } else {
                 System.out.println("ip or apexDomain empty!, ignoring record: <" + ipStr + ", " + apexDomain + ">");
@@ -171,7 +174,8 @@ public class App {
 
     }
 
-    public void writeRecord(String apexDomain, String recordType, String subDomain, InetAddress ipAddress, String country,
+    public void writeRecord(String apexDomain, String recordType, String subDomain, InetAddress ipAddress,
+            String country,
             String city, String asn, String as_name)
             throws IOException, SkippedEntryProcessingException {
         try {
