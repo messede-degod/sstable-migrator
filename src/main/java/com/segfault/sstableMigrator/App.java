@@ -87,9 +87,10 @@ public class App {
                 + " city  VARCHAR,"
                 + " asn   VARCHAR,"
                 + " as_name VARCHAR,"
+                + " tld VARCHAR,"
                 + " PRIMARY KEY (ipAddress,apexDomain,subDomain) );";
 
-        String insert = "INSERT INTO ferret.dnsdata (apexDomain, recordType, subDomain, ipAddress, country, city, asn, as_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        String insert = "INSERT INTO ferret.dnsdata (apexDomain, recordType, subDomain, ipAddress, country, city, asn, as_name,tld) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         File directory = new File(keyspace);
         if (!directory.exists())
@@ -121,6 +122,7 @@ public class App {
 
         String apexDomain = jo.getString("name");
         JSONArray answers = jo.getJSONObject("data").getJSONArray("answers");
+        String tld = App.getTld(apexDomain);
 
         for (int i = 0; i < answers.length(); i++) {
             JSONObject ans = answers.getJSONObject(i);
@@ -153,7 +155,7 @@ public class App {
             InetAddress parsedIpAddress = InetAddress.getByName(ipStr);
 
             // Lookup GEO and ASN Details using MMDB;
-            if(isARecord) {
+            if (isARecord) {
                 LookupResult result = this.MMDBReader.get(parsedIpAddress, LookupResult.class);
                 if (result != null) {
                     country = result.country;
@@ -166,7 +168,7 @@ public class App {
             }
 
             if (apexDomain != "" && apexDomain != null) {
-                this.writeRecord(apexDomain, recordType, subdomain, parsedIpAddress, country, city, asn, as_name);
+                this.writeRecord(apexDomain, recordType, subdomain, parsedIpAddress, country, city, asn, as_name, tld);
             } else {
                 System.out.println("ip or apexDomain empty!, ignoring record: <" + ipStr + ", " + apexDomain + ">");
             }
@@ -176,10 +178,10 @@ public class App {
 
     public void writeRecord(String apexDomain, String recordType, String subDomain, InetAddress ipAddress,
             String country,
-            String city, String asn, String as_name)
+            String city, String asn, String as_name, String tld)
             throws IOException, SkippedEntryProcessingException {
         try {
-            this.writer.addRow(apexDomain, recordType, subDomain, ipAddress, country, city, asn, as_name);
+            this.writer.addRow(apexDomain, recordType, subDomain, ipAddress, country, city, asn, as_name, tld);
             this.processedEntries++;
         } catch (InvalidRequestException ie) {
             System.out.println("InvalidRequestException: faile to write entry <" + apexDomain + "," + recordType + ","
@@ -211,4 +213,14 @@ public class App {
             this.as_name = as_name;
         }
     }
+
+    public static String getTld(String domain) {
+        String parts[] = domain.split(".");
+        int index = parts.length - 1;
+        if (index > 0) {
+            return parts[parts.length - 1];
+        }
+        return "";
+    }
+
 }
