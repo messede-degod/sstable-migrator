@@ -25,11 +25,14 @@ public class App {
     int processedEntries = 0;
     int processedFiles = 0;
     int lookedUpEntries = 0;
+    static InetAddress zeroAddr = null;
 
     public static void main(String[] args) throws IOException {
 
         BufferedReader reader;
+
         App csw = new App();
+        App.zeroAddr = InetAddress.getByName("0.0.0.0");
 
         File directory = new File("input/");
         File[] files = directory.listFiles();
@@ -82,15 +85,18 @@ public class App {
                 + " apexDomain VARCHAR,"
                 + " recordType VARCHAR,"
                 + " subDomain VARCHAR,"
+                + " ip8 INET,"
+                + " ip16 INET,"
+                + " ip24 INET,"
                 + " ipAddress INET,"
                 + " country VARCHAR,"
                 + " city  VARCHAR,"
                 + " asn   VARCHAR,"
                 + " as_name VARCHAR,"
                 + " tld VARCHAR,"
-                + " PRIMARY KEY (ipAddress,apexDomain,subDomain) );";
+                + " PRIMARY KEY (ip8,ip16,ip24,ipAddress,apexDomain,subDomain) );";
 
-        String insert = "INSERT INTO ferret.dnsdata (apexDomain, recordType, subDomain, ipAddress, country, city, asn, as_name,tld) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        String insert = "INSERT INTO ferret.dnsdata (apexDomain, recordType, subDomain, ip8, ip16, ip24, ipAddress, country, city, asn, as_name,tld) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         File directory = new File(keyspace);
         if (!directory.exists())
@@ -146,16 +152,26 @@ public class App {
 
             Boolean isARecord = recordType.equals("a");
 
+            InetAddress parsedIpAddress = null;
+            InetAddress ip8 = null;
+            InetAddress ip16 = null;
+            InetAddress ip24 = null;
+
             if (!isARecord) {
                 // Handle CNAME's properly
                 apexDomain = ipStr;
                 ipStr = "0.0.0.0";
-            }
+                parsedIpAddress = App.zeroAddr;
+                ip8 = App.zeroAddr;
+                ip16 = App.zeroAddr;
+                ip24 = App.zeroAddr;
+            } else {
+                parsedIpAddress = InetAddress.getByName(ipStr);
+                ip8 = App.getIPBlock(parsedIpAddress, (short) 8);
+                ip16 = App.getIPBlock(parsedIpAddress, (short) 16);
+                ip24 = App.getIPBlock(parsedIpAddress, (short) 24);
 
-            InetAddress parsedIpAddress = InetAddress.getByName(ipStr);
-
-            // Lookup GEO and ASN Details using MMDB;
-            if (isARecord) {
+                // Lookup GEO and ASN Details using MMDB;
                 LookupResult result = this.MMDBReader.get(parsedIpAddress, LookupResult.class);
                 if (result != null) {
                     country = result.country;
@@ -168,7 +184,8 @@ public class App {
             }
 
             if (apexDomain != "" && apexDomain != null) {
-                this.writeRecord(apexDomain, recordType, subdomain, parsedIpAddress, country, city, asn, as_name, tld);
+                this.writeRecord(apexDomain, recordType, subdomain, ip8, ip16, ip24,
+                        parsedIpAddress, country, city, asn, as_name, tld);
             } else {
                 System.out.println("ip or apexDomain empty!, ignoring record: <" + ipStr + ", " + apexDomain + ">");
             }
@@ -176,12 +193,14 @@ public class App {
 
     }
 
-    public void writeRecord(String apexDomain, String recordType, String subDomain, InetAddress ipAddress,
+    public void writeRecord(String apexDomain, String recordType, String subDomain, InetAddress ip8, InetAddress ip16,
+            InetAddress ip24, InetAddress ipAddress,
             String country,
             String city, String asn, String as_name, String tld)
             throws IOException, SkippedEntryProcessingException {
         try {
-            this.writer.addRow(apexDomain, recordType, subDomain, ipAddress, country, city, asn, as_name, tld);
+            this.writer.addRow(apexDomain, recordType, subDomain, ip8, ip16, ip24, ipAddress, country, city, asn,
+                    as_name, tld);
             this.processedEntries++;
         } catch (InvalidRequestException ie) {
             System.out.println("InvalidRequestException: faile to write entry <" + apexDomain + "," + recordType + ","
@@ -221,6 +240,31 @@ public class App {
             return parts[parts.length - 1];
         }
         return "";
+    }
+
+    private static InetAddress getIPBlock(InetAddress ipAddress, short prefixLength) {
+        byte[] addressBytes = ipAddress.getAddress();
+        int mask = (0xFFFFFFFF << (32 - prefixLength)) & 0xFFFFFFFF;
+
+        int networkAddress = (addressBytes[0] & 0xFF) << 24 |
+                (addressBytes[1] & 0xFF) << 16 |
+                (addressBytes[2] & 0xFF) << 8 |
+                (addressBytes[3] & 0xFF);
+
+        int maskedNetworkAddress = networkAddress & mask;
+
+        try {
+            byte[] maskedAddressBytes = new byte[] {
+                    (byte) ((maskedNetworkAddress >> 24) & 0xFF),
+                    (byte) ((maskedNetworkAddress >> 16) & 0xFF),
+                    (byte) ((maskedNetworkAddress >> 8) & 0xFF),
+                    (byte) (maskedNetworkAddress & 0xFF)
+            };
+            return InetAddress.getByAddress(maskedAddressBytes);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
 }
