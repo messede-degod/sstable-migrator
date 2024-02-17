@@ -94,7 +94,7 @@ public class App {
                 + " asn   VARCHAR,"
                 + " as_name VARCHAR,"
                 + " tld VARCHAR,"
-                + " PRIMARY KEY (ip8,ip16,ip24,ipAddress,apexDomain,subDomain) );";
+                + " PRIMARY KEY (ip8,ip16,ip24,ipAddress,tld,apexDomain) );";
 
         String insert = "INSERT INTO ferret.dnsdata (apexDomain, recordType, subDomain, ip8, ip16, ip24, ipAddress, country, city, asn, as_name,tld) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
@@ -234,10 +234,10 @@ public class App {
     }
 
     public static String getTld(String domain) {
-        String parts[] = domain.split(".");
+        String parts[] = domain.split("\\.");
         int index = parts.length - 1;
         if (index > 0) {
-            return parts[parts.length - 1];
+            return parts[index];
         }
         return "";
     }
