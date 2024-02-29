@@ -17,6 +17,9 @@ import com.maxmind.db.MaxMindDbConstructor;
 import com.maxmind.db.MaxMindDbParameter;
 import com.maxmind.db.Reader;
 import java.net.InetAddress;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 public class App {
 
@@ -27,12 +30,25 @@ public class App {
     int lookedUpEntries = 0;
     static InetAddress zeroAddr = null;
 
+    static Map<String,String> TLDs = new HashMap<String, String>(){{}};
+
+    public static void readTLD() throws IOException{
+        BufferedReader reader = new BufferedReader(new FileReader("./TLD.txt"));
+        String line = reader.readLine();
+        while (line != null) {
+            TLDs.put(line, line);
+            line = reader.readLine();
+        }
+        reader.close();
+    }
+
     public static void main(String[] args) throws IOException {
 
         BufferedReader reader;
 
         App csw = new App();
         App.zeroAddr = InetAddress.getByName("0.0.0.0");
+        App.readTLD();
 
         File directory = new File("input/");
         File[] files = directory.listFiles();
@@ -126,9 +142,12 @@ public class App {
     public void parseAndInsert(String jsonString) throws IOException, SkippedEntryProcessingException {
         JSONObject jo = new JSONObject(jsonString);
 
-        String apexDomain = jo.getString("name");
+        String domain = jo.getString("name");
         JSONArray answers = jo.getJSONObject("data").getJSONArray("answers");
-        String tld = App.getTld(apexDomain);
+        String Data[] = App.getTLDAndApexDomain(domain);
+
+        String apexDomain = Data[1];
+        String tld = Data[0];
 
         for (int i = 0; i < answers.length(); i++) {
             JSONObject ans = answers.getJSONObject(i);
@@ -233,15 +252,6 @@ public class App {
         }
     }
 
-    public static String getTld(String domain) {
-        String parts[] = domain.split("\\.");
-        int index = parts.length - 1;
-        if (index > 0) {
-            return parts[index];
-        }
-        return "";
-    }
-
     private static InetAddress getIPBlock(InetAddress ipAddress, short prefixLength) {
         byte[] addressBytes = ipAddress.getAddress();
         int mask = (0xFFFFFFFF << (32 - prefixLength)) & 0xFFFFFFFF;
@@ -265,6 +275,35 @@ public class App {
             e.printStackTrace();
             return null;
         }
+    }
+
+    public static String[] getTLDAndApexDomain(String domain) {
+        String parts[] = domain.split("\\.");
+        int tldIndex = parts.length - 1;
+        boolean tldExists = tldIndex > 0;
+
+        if(tldExists){
+
+            StringBuilder apexDomain = new StringBuilder();
+
+            //  abc.co.de }---> already extracted as tld
+            //      |-------> we must check for second level tld                          
+
+            if(TLDs.get(parts[tldIndex-1])==null){ // not a tld
+                apexDomain.append(String.join(".",Arrays.copyOfRange(parts,tldIndex-1,tldIndex+1)));
+            }else{ // is a tld
+                int startIndex = tldIndex-2;
+                if(startIndex<0){
+                    startIndex = 0;
+                }
+                apexDomain.append(String.join(".",Arrays.copyOfRange(parts,startIndex,tldIndex+1)));
+            }
+            apexDomain.append(".");
+
+            return new String[]{parts[tldIndex],apexDomain.toString()};
+        }
+        
+        return new String[]{"",domain};
     }
 
 }
