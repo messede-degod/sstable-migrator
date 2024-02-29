@@ -30,9 +30,12 @@ public class App {
     int lookedUpEntries = 0;
     static InetAddress zeroAddr = null;
 
-    static Map<String,String> TLDs = new HashMap<String, String>(){{}};
+    static Map<String, String> TLDs = new HashMap<String, String>() {
+        {
+        }
+    };
 
-    public static void readTLD() throws IOException{
+    public static void readTLD() throws IOException {
         BufferedReader reader = new BufferedReader(new FileReader("./TLD.txt"));
         String line = reader.readLine();
         while (line != null) {
@@ -50,7 +53,7 @@ public class App {
         App.zeroAddr = InetAddress.getByName("0.0.0.0");
         App.readTLD();
 
-        File directory = new File("input/");
+        File directory = new File("csv_input/");
         File[] files = directory.listFiles();
         System.out.println("Found: " + files.length + " files in input directory.");
 
@@ -60,7 +63,7 @@ public class App {
 
                 String line = reader.readLine();
                 while (line != null) {
-                    csw.parseAndInsert(line);
+                    csw.parseAndInsertCSV(line);
                     line = reader.readLine();
                 }
 
@@ -212,6 +215,58 @@ public class App {
 
     }
 
+    public void parseAndInsertCSV(String csvString) throws IOException, SkippedEntryProcessingException {
+        String[] dataParts = csvString.split("\\,");
+
+
+        if(dataParts.length<2){
+            System.out.println("Ignoring Partial Record: "+csvString);
+            return;
+        }
+
+        String ipStr = dataParts[0];
+        String domain = dataParts[1];
+
+        String Data[] = App.getTLDAndApexDomain(domain);
+        String apexDomain = Data[1];
+        String tld = Data[0];
+
+        String recordType = "a";
+        String country = "";
+        String city = "";
+        String asn = "";
+        String as_name = "";
+
+        // Parse Ip Address and Extract Blocks
+        InetAddress parsedIpAddress = null;
+        InetAddress ip8 = null;
+        InetAddress ip16 = null;
+        InetAddress ip24 = null;
+
+        parsedIpAddress = InetAddress.getByName(ipStr);
+        ip8 = App.getIPBlock(parsedIpAddress, (short) 8);
+        ip16 = App.getIPBlock(parsedIpAddress, (short) 16);
+        ip24 = App.getIPBlock(parsedIpAddress, (short) 24);
+
+        // Lookup GEO and ASN Details using MMDB;
+        LookupResult result = this.MMDBReader.get(parsedIpAddress, LookupResult.class);
+        if (result != null) {
+            country = result.country;
+            asn = result.asn;
+            as_name = result.as_name;
+        }
+        this.lookedUpEntries += 1;
+        result = null;
+
+        if (apexDomain != "" && apexDomain != null) {
+            this.writeRecord(apexDomain, recordType, domain, ip8, ip16, ip24,
+                    parsedIpAddress, country, city, asn, as_name, tld);
+        } else {
+            System.out.println("ip or apexDomain empty!, ignoring record: <" + ipStr + ", " + apexDomain + ">");
+        }
+
+    }
+
     public void writeRecord(String apexDomain, String recordType, String subDomain, InetAddress ip8, InetAddress ip16,
             InetAddress ip24, InetAddress ipAddress,
             String country,
@@ -282,28 +337,28 @@ public class App {
         int tldIndex = parts.length - 1;
         boolean tldExists = tldIndex > 0;
 
-        if(tldExists){
+        if (tldExists) {
 
             StringBuilder apexDomain = new StringBuilder();
 
-            //  abc.co.de }---> already extracted as tld
-            //      |-------> we must check for second level tld                          
+            // abc.co.de }---> already extracted as tld
+            // |-------> we must check for second level tld
 
-            if(TLDs.get(parts[tldIndex-1])==null){ // not a tld
-                apexDomain.append(String.join(".",Arrays.copyOfRange(parts,tldIndex-1,tldIndex+1)));
-            }else{ // is a tld
-                int startIndex = tldIndex-2;
-                if(startIndex<0){
+            if (TLDs.get(parts[tldIndex - 1]) == null) { // not a tld
+                apexDomain.append(String.join(".", Arrays.copyOfRange(parts, tldIndex - 1, tldIndex + 1)));
+            } else { // is a tld
+                int startIndex = tldIndex - 2;
+                if (startIndex < 0) {
                     startIndex = 0;
                 }
-                apexDomain.append(String.join(".",Arrays.copyOfRange(parts,startIndex,tldIndex+1)));
+                apexDomain.append(String.join(".", Arrays.copyOfRange(parts, startIndex, tldIndex + 1)));
             }
             apexDomain.append(".");
 
-            return new String[]{parts[tldIndex],apexDomain.toString()};
+            return new String[] { parts[tldIndex], apexDomain.toString() };
         }
-        
-        return new String[]{"",domain};
+
+        return new String[] { "", domain };
     }
 
 }
