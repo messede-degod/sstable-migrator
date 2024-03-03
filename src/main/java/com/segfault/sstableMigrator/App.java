@@ -17,6 +17,7 @@ import com.maxmind.db.MaxMindDbConstructor;
 import com.maxmind.db.MaxMindDbParameter;
 import com.maxmind.db.Reader;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -243,7 +244,13 @@ public class App {
         InetAddress ip16 = null;
         InetAddress ip24 = null;
 
+        try{
         parsedIpAddress = InetAddress.getByName(ipStr);
+        }catch(UnknownHostException e){
+            System.out.println("Invalid Ip Address: "+csvString);
+            return;
+        }
+
         ip8 = App.getIPBlock(parsedIpAddress, (short) 8);
         ip16 = App.getIPBlock(parsedIpAddress, (short) 16);
         ip24 = App.getIPBlock(parsedIpAddress, (short) 24);
