@@ -3,6 +3,7 @@ package com.segfault.sstableMigrator;
 import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.io.sstable.CQLSSTableWriter;
+import org.apache.commons.lang3.ArrayUtils;
 import org.json.JSONObject;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -352,13 +353,13 @@ public class App {
             // |-------> we must check for second level tld
 
             if (TLDs.get(parts[tldIndex - 1]) == null) { // not a tld
-                apexDomain.append(String.join(".", Arrays.copyOfRange(parts, tldIndex - 1, tldIndex + 1)));
+                apexDomain.append(String.join(".", ArrayUtils.subarray(parts, tldIndex - 1, tldIndex + 1)));
             } else { // is a tld
                 int startIndex = tldIndex - 2;
                 if (startIndex < 0) {
                     startIndex = 0;
                 }
-                apexDomain.append(String.join(".", Arrays.copyOfRange(parts, startIndex, tldIndex + 1)));
+                apexDomain.append(String.join(".",ArrayUtils.subarray(parts, startIndex, tldIndex + 1)));
             }
             apexDomain.append(".");
 
