@@ -222,7 +222,7 @@ public class App {
 
 
         if(dataParts.length<2){
-            System.out.println("Ignoring Partial Record: "+csvString);
+            // System.out.println("Ignoring Partial Record: "+csvString);
             return;
         }
 
