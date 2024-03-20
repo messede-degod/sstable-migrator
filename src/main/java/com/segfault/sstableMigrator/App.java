@@ -6,7 +6,6 @@ import org.apache.cassandra.io.sstable.CQLSSTableWriter;
 import org.apache.commons.lang3.ArrayUtils;
 import org.json.JSONObject;
 import org.json.JSONArray;
-import org.json.JSONException;
 
 import java.io.File;
 import java.io.IOException;
@@ -14,19 +13,22 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 
 import com.maxmind.db.CHMCache;
-import com.maxmind.db.MaxMindDbConstructor;
-import com.maxmind.db.MaxMindDbParameter;
-import com.maxmind.db.Reader;
+import com.maxmind.geoip2.DatabaseReader;
+import com.maxmind.geoip2.exception.GeoIp2Exception;
+import com.maxmind.geoip2.model.AsnResponse;
+import com.maxmind.geoip2.model.CityResponse;
+
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
 public class App {
 
     CQLSSTableWriter writer;
-    Reader MMDBReader;
+    DatabaseReader MMDBCityReader;
+    DatabaseReader MMDBASNReader;
+
     int processedEntries = 0;
     int processedFiles = 0;
     int lookedUpEntries = 0;
@@ -55,7 +57,9 @@ public class App {
         App.zeroAddr = InetAddress.getByName("0.0.0.0");
         App.readTLD();
 
-        File directory = new File("csv_input/");
+        // File directory = new File("csv_input/");
+        File directory = new File("input/");
+
         File[] files = directory.listFiles();
         System.out.println("Found: " + files.length + " files in input directory.");
 
@@ -65,7 +69,8 @@ public class App {
 
                 String line = reader.readLine();
                 while (line != null) {
-                    csw.parseAndInsertCSV(line);
+                    // csw.parseAndInsertCSV(line);
+                    csw.parseAndInsertJSON(line);
                     line = reader.readLine();
                 }
 
@@ -89,7 +94,10 @@ public class App {
         System.out.println("Finished processing all files.");
 
         csw.writer.close();
-        csw.MMDBReader.close();
+
+        csw.MMDBCityReader.close();
+        csw.MMDBASNReader.close();
+
         System.out.println("Writer closed Successfully");
         System.out.println("Processed " + csw.processedEntries + " Entries");
         System.out.println("Processed " + csw.processedFiles + " Files");
@@ -135,17 +143,25 @@ public class App {
 
         System.out.println("Writer created Successfully");
 
-        File database = new File("misc/country_asn.mmdb");
+        File cityDatabase = new File("misc/geocity.mmdb");
+        File asnDatabase = new File("misc/geoasn.mmdb");
 
         try {
-            this.MMDBReader = new Reader(database, new CHMCache(262144));
+            this.MMDBCityReader = new DatabaseReader.Builder(cityDatabase).withCache(new CHMCache(262144)).build();
+            this.MMDBASNReader = new DatabaseReader.Builder(asnDatabase).withCache(new CHMCache(262144)).build();
         } catch (IOException e) {
             System.out.println("Error OPening MMDB :: " + e.toString());
         }
     }
 
-    public void parseAndInsert(String jsonString) throws IOException, SkippedEntryProcessingException {
-        JSONObject jo = new JSONObject(jsonString);
+    public void parseAndInsertJSON(String jsonString) throws IOException, SkippedEntryProcessingException {
+        JSONObject jo = null;
+        try {
+            jo = new JSONObject(jsonString);
+        } catch (Exception e) {
+            System.out.println(jsonString + " - " + e.toString());
+            return;
+        }
 
         String domain = jo.getString("name");
         JSONArray answers = jo.getJSONObject("data").getJSONArray("answers");
@@ -164,15 +180,6 @@ public class App {
             String city = "";
             String asn = "";
             String as_name = "";
-
-            // Read the default Geo Data from DP DB
-            try {
-                JSONObject geo = ans.getJSONObject("geoIP");
-                country = geo.getString("Country");
-                city = geo.getString("City");
-            } catch (JSONException e) {
-                continue;
-            }
 
             Boolean isARecord = recordType.equals("a");
 
@@ -196,15 +203,24 @@ public class App {
                 ip24 = App.getIPBlock(parsedIpAddress, (short) 24);
 
                 // Lookup GEO and ASN Details using MMDB;
-                LookupResult result = this.MMDBReader.get(parsedIpAddress, LookupResult.class);
-                if (result != null) {
-                    country = result.country;
-                    asn = result.asn;
-                    as_name = result.as_name;
-                }
-                this.lookedUpEntries += 1;
-                result = null;
+                try {
+                    CityResponse cityResult = this.MMDBCityReader.city(parsedIpAddress);
+                    AsnResponse asnResult = this.MMDBASNReader.asn(parsedIpAddress);
 
+                    if (cityResult != null) {
+                        country = cityResult.getCountry().getIsoCode();
+                        city = cityResult.getCity().getName();
+                    }
+
+                    if (asnResult != null) {
+                        asn = asnResult.getAutonomousSystemNumber().toString();
+                        as_name = asnResult.getAutonomousSystemOrganization();
+                    }
+
+                    this.lookedUpEntries += 1;
+                } catch (GeoIp2Exception e) {
+                    // System.out.println(ipStr + " - " + e.toString());
+                }
             }
 
             if (apexDomain != "" && apexDomain != null) {
@@ -220,8 +236,7 @@ public class App {
     public void parseAndInsertCSV(String csvString) throws IOException, SkippedEntryProcessingException {
         String[] dataParts = csvString.split("\\,");
 
-
-        if(dataParts.length<2){
+        if (dataParts.length < 2) {
             // System.out.println("Ignoring Partial Record: "+csvString);
             return;
         }
@@ -245,10 +260,10 @@ public class App {
         InetAddress ip16 = null;
         InetAddress ip24 = null;
 
-        try{
-        parsedIpAddress = InetAddress.getByName(ipStr);
-        }catch(UnknownHostException e){
-            System.out.println("Invalid Ip Address: "+csvString);
+        try {
+            parsedIpAddress = InetAddress.getByName(ipStr);
+        } catch (UnknownHostException e) {
+            System.out.println("Invalid Ip Address: " + csvString);
             return;
         }
 
@@ -257,14 +272,24 @@ public class App {
         ip24 = App.getIPBlock(parsedIpAddress, (short) 24);
 
         // Lookup GEO and ASN Details using MMDB;
-        LookupResult result = this.MMDBReader.get(parsedIpAddress, LookupResult.class);
-        if (result != null) {
-            country = result.country;
-            asn = result.asn;
-            as_name = result.as_name;
+        try {
+            CityResponse cityResult = this.MMDBCityReader.city(parsedIpAddress);
+            AsnResponse asnResult = this.MMDBASNReader.asn(parsedIpAddress);
+
+            if (cityResult != null) {
+                country = cityResult.getCountry().getIsoCode();
+                city = cityResult.getCity().getName();
+            }
+
+            if (asnResult != null) {
+                asn = asnResult.getAutonomousSystemNumber().toString();
+                as_name = asnResult.getAutonomousSystemOrganization();
+            }
+
+            this.lookedUpEntries += 1;
+        } catch (GeoIp2Exception e) {
+            System.out.println(ipStr + " - " + e.toString());
         }
-        this.lookedUpEntries += 1;
-        result = null;
 
         if (apexDomain != "" && apexDomain != null) {
             this.writeRecord(apexDomain, recordType, domain, ip8, ip16, ip24,
@@ -299,22 +324,6 @@ public class App {
         }
     }
 
-    public static class LookupResult {
-        public final String country;
-        public final String asn;
-        public final String as_name;
-
-        @MaxMindDbConstructor
-        public LookupResult(
-                @MaxMindDbParameter(name = "country") String country,
-                @MaxMindDbParameter(name = "asn") String asn,
-                @MaxMindDbParameter(name = "as_name") String as_name) {
-            this.country = country;
-            this.asn = asn;
-            this.as_name = as_name;
-        }
-    }
-
     private static InetAddress getIPBlock(InetAddress ipAddress, short prefixLength) {
         byte[] addressBytes = ipAddress.getAddress();
         int mask = (0xFFFFFFFF << (32 - prefixLength)) & 0xFFFFFFFF;
@@ -346,11 +355,10 @@ public class App {
         boolean tldExists = tldIndex > 0;
 
         if (tldExists) {
-
             StringBuilder apexDomain = new StringBuilder();
 
             // abc.co.de }---> already extracted as tld
-            // |-------> we must check for second level tld
+            //     \/----> we must check for second level tld
 
             if (TLDs.get(parts[tldIndex - 1]) == null) { // not a tld
                 apexDomain.append(String.join(".", ArrayUtils.subarray(parts, tldIndex - 1, tldIndex + 1)));
@@ -359,7 +367,7 @@ public class App {
                 if (startIndex < 0) {
                     startIndex = 0;
                 }
-                apexDomain.append(String.join(".",ArrayUtils.subarray(parts, startIndex, tldIndex + 1)));
+                apexDomain.append(String.join(".", ArrayUtils.subarray(parts, startIndex, tldIndex + 1)));
             }
             apexDomain.append(".");
 
