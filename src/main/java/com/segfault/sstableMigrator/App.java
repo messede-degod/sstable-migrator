@@ -163,17 +163,19 @@ public class App {
             return;
         }
 
-        String domain = jo.getString("name");
         JSONArray answers = jo.getJSONObject("data").getJSONArray("answers");
-        String Data[] = App.getTLDAndApexDomain(domain);
-
-        String apexDomain = Data[1];
-        String tld = Data[0];
 
         for (int i = 0; i < answers.length(); i++) {
             JSONObject ans = answers.getJSONObject(i);
 
             String subdomain = ans.getString("name");
+
+            // find apexDomain and tld
+            String Data[] = App.getTLDAndApexDomain(subdomain);
+            String apexDomain = Data[1];
+            String tld = Data[0];
+            // --
+
             String ipStr = ans.getString("data");
             String recordType = ans.getString("type");
             String country = "";
