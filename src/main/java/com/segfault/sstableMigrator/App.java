@@ -183,16 +183,16 @@ public class App {
             String asn = "";
             String as_name = "";
 
-            Boolean isARecord = recordType.equals("a");
 
             InetAddress parsedIpAddress = null;
             InetAddress ip8 = null;
             InetAddress ip16 = null;
             InetAddress ip24 = null;
 
-            if (!isARecord) {
+            if (!recordType.equals("a")) {
                 // Handle CNAME's properly
                 apexDomain = ipStr;
+                recordType = "CNAME";
                 ipStr = "0.0.0.0";
                 parsedIpAddress = App.zeroAddr;
                 ip8 = App.zeroAddr;
@@ -200,6 +200,7 @@ public class App {
                 ip24 = App.zeroAddr;
             } else {
                 parsedIpAddress = InetAddress.getByName(ipStr);
+                recordType = "A";
                 ip8 = App.getIPBlock(parsedIpAddress, (short) 8);
                 ip16 = App.getIPBlock(parsedIpAddress, (short) 16);
                 ip24 = App.getIPBlock(parsedIpAddress, (short) 24);
@@ -238,19 +239,21 @@ public class App {
     public void parseAndInsertCSV(String csvString) throws IOException, SkippedEntryProcessingException {
         String[] dataParts = csvString.split("\\,");
 
-        if (dataParts.length < 2) {
+        // Domain,RecordType,IP
+
+        if (dataParts.length < 3) {
             // System.out.println("Ignoring Partial Record: "+csvString);
             return;
         }
 
-        String ipStr = dataParts[0];
-        String domain = dataParts[1];
+        String ipStr = dataParts[2];
+        String recordType = dataParts[1];
+        String domain = dataParts[0];
 
         String Data[] = App.getTLDAndApexDomain(domain);
         String apexDomain = Data[1];
         String tld = Data[0];
 
-        String recordType = "a";
         String country = "";
         String city = "";
         String asn = "";
@@ -262,35 +265,47 @@ public class App {
         InetAddress ip16 = null;
         InetAddress ip24 = null;
 
-        try {
-            parsedIpAddress = InetAddress.getByName(ipStr);
-        } catch (UnknownHostException e) {
-            System.out.println("Invalid Ip Address: " + csvString);
-            return;
-        }
+        if (!recordType.equals("A")) {
+            // Handle CNAME's properly
+            apexDomain = ipStr;
+            recordType = "CNAME";
+            ipStr = "0.0.0.0";
+            parsedIpAddress = App.zeroAddr;
+            ip8 = App.zeroAddr;
+            ip16 = App.zeroAddr;
+            ip24 = App.zeroAddr;
+        } else {
 
-        ip8 = App.getIPBlock(parsedIpAddress, (short) 8);
-        ip16 = App.getIPBlock(parsedIpAddress, (short) 16);
-        ip24 = App.getIPBlock(parsedIpAddress, (short) 24);
-
-        // Lookup GEO and ASN Details using MMDB;
-        try {
-            CityResponse cityResult = this.MMDBCityReader.city(parsedIpAddress);
-            AsnResponse asnResult = this.MMDBASNReader.asn(parsedIpAddress);
-
-            if (cityResult != null) {
-                country = cityResult.getCountry().getIsoCode();
-                city = cityResult.getCity().getName();
+            try {
+                parsedIpAddress = InetAddress.getByName(ipStr);
+            } catch (UnknownHostException e) {
+                System.out.println("Invalid Ip Address: " + csvString);
+                return;
             }
 
-            if (asnResult != null) {
-                asn = asnResult.getAutonomousSystemNumber().toString();
-                as_name = asnResult.getAutonomousSystemOrganization();
-            }
+            ip8 = App.getIPBlock(parsedIpAddress, (short) 8);
+            ip16 = App.getIPBlock(parsedIpAddress, (short) 16);
+            ip24 = App.getIPBlock(parsedIpAddress, (short) 24);
 
-            this.lookedUpEntries += 1;
-        } catch (GeoIp2Exception e) {
-            System.out.println(ipStr + " - " + e.toString());
+            // Lookup GEO and ASN Details using MMDB;
+            try {
+                CityResponse cityResult = this.MMDBCityReader.city(parsedIpAddress);
+                AsnResponse asnResult = this.MMDBASNReader.asn(parsedIpAddress);
+
+                if (cityResult != null) {
+                    country = cityResult.getCountry().getIsoCode();
+                    city = cityResult.getCity().getName();
+                }
+
+                if (asnResult != null) {
+                    asn = asnResult.getAutonomousSystemNumber().toString();
+                    as_name = asnResult.getAutonomousSystemOrganization();
+                }
+
+                this.lookedUpEntries += 1;
+            } catch (GeoIp2Exception e) {
+                // System.out.println(ipStr + " - " + e.toString());
+            }
         }
 
         if (apexDomain != "" && apexDomain != null) {
@@ -360,7 +375,7 @@ public class App {
             StringBuilder apexDomain = new StringBuilder();
 
             // abc.co.de }---> already extracted as tld
-            //     \/----> we must check for second level tld
+            // \/----> we must check for second level tld
 
             if (TLDs.get(parts[tldIndex - 1]) == null) { // not a tld
                 apexDomain.append(String.join(".", ArrayUtils.subarray(parts, tldIndex - 1, tldIndex + 1)));
