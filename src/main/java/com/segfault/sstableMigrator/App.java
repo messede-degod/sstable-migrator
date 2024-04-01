@@ -57,8 +57,8 @@ public class App {
         App.zeroAddr = InetAddress.getByName("0.0.0.0");
         App.readTLD();
 
-        // File directory = new File("csv_input/");
-        File directory = new File("input/");
+        File directory = new File("csv_input/");
+        // File directory = new File("input/");
 
         File[] files = directory.listFiles();
         System.out.println("Found: " + files.length + " files in input directory.");
@@ -69,8 +69,8 @@ public class App {
 
                 String line = reader.readLine();
                 while (line != null) {
-                    // csw.parseAndInsertCSV(line);
-                    csw.parseAndInsertJSON(line);
+                    csw.parseAndInsertCSV(line);
+                    // csw.parseAndInsertJSON(line);
                     line = reader.readLine();
                 }
 
@@ -123,7 +123,7 @@ public class App {
                 + " asn   VARCHAR,"
                 + " as_name VARCHAR,"
                 + " tld VARCHAR,"
-                + " PRIMARY KEY (ip8,ip16,ip24,ipAddress,tld,apexDomain) );";
+                + " PRIMARY KEY (ip8,ip16,ip24,ipAddress,tld,apexDomain,subDomain) );";
 
         String insert = "INSERT INTO ferret.dnsdata (apexDomain, recordType, subDomain, ip8, ip16, ip24, ipAddress, country, city, asn, as_name,tld) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
