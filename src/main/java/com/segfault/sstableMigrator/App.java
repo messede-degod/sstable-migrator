@@ -245,7 +245,6 @@ public class App {
             if (isCNAME) {
                 // Handle CNAME's properly
                 recordType = "CNAME";
-                ipStr = "0.0.0.0";
                 parsedIpAddress = App.zeroAddr;
                 ip8 = App.zeroAddr;
                 ip16 = App.zeroAddr;
@@ -335,7 +334,6 @@ public class App {
             // Handle CNAME's properly
             apexDomain = ipStr;
             recordType = "CNAME";
-            ipStr = "0.0.0.0";
             parsedIpAddress = App.zeroAddr;
             ip8 = App.zeroAddr;
             ip16 = App.zeroAddr;
