@@ -25,7 +25,10 @@ import java.util.Map;
 
 public class App {
 
-    CQLSSTableWriter writer;
+    CQLSSTableWriter RDNSWriter;
+    CQLSSTableWriter CNAMEWriter;
+    CQLSSTableWriter SubDomainWriter;
+
     DatabaseReader MMDBCityReader;
     DatabaseReader MMDBASNReader;
 
@@ -57,8 +60,8 @@ public class App {
         App.zeroAddr = InetAddress.getByName("0.0.0.0");
         App.readTLD();
 
-        File directory = new File("csv_input/");
-        // File directory = new File("input/");
+        // File directory = new File("csv_input/");
+        File directory = new File("input/");
 
         File[] files = directory.listFiles();
         System.out.println("Found: " + files.length + " files in input directory.");
@@ -69,8 +72,8 @@ public class App {
 
                 String line = reader.readLine();
                 while (line != null) {
-                    csw.parseAndInsertCSV(line);
-                    // csw.parseAndInsertJSON(line);
+                    // csw.parseAndInsertCSV(line);
+                    csw.parseAndInsertJSON(line);
                     line = reader.readLine();
                 }
 
@@ -93,12 +96,14 @@ public class App {
 
         System.out.println("Finished processing all files.");
 
-        csw.writer.close();
+        csw.RDNSWriter.close();
+        csw.CNAMEWriter.close();
+        csw.SubDomainWriter.close();
 
         csw.MMDBCityReader.close();
         csw.MMDBASNReader.close();
 
-        System.out.println("Writer closed Successfully");
+        System.out.println("Writer(s) closed Successfully");
         System.out.println("Processed " + csw.processedEntries + " Entries");
         System.out.println("Processed " + csw.processedFiles + " Files");
         System.out.println("LookedUp " + csw.lookedUpEntries + " Records");
@@ -106,11 +111,11 @@ public class App {
     }
 
     public App() {
-        String outputDir = "./output/";
         String keyspace = "ferret";
-        String table = "dnsdata";
+        String outputDir = "./output/";
 
-        String schema = "CREATE TABLE ferret.dnsdata ("
+        // RDNS table
+        String RDNSSchema = "CREATE TABLE ferret.dnsdata ("
                 + " apexDomain VARCHAR,"
                 + " recordType VARCHAR,"
                 + " subDomain VARCHAR,"
@@ -125,23 +130,70 @@ public class App {
                 + " tld VARCHAR,"
                 + " PRIMARY KEY (ip8,ip16,ip24,ipAddress,tld,apexDomain,subDomain) );";
 
-        String insert = "INSERT INTO ferret.dnsdata (apexDomain, recordType, subDomain, ip8, ip16, ip24, ipAddress, country, city, asn, as_name,tld) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        String RDNSInsert = "INSERT INTO ferret.dnsdata (apexDomain, recordType, subDomain, ip8, ip16, ip24, ipAddress, country, city, asn, as_name,tld) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        String RDNSTable = "dnsdata";
+        String RDNSOutputDir = outputDir + RDNSTable + "/";
+
+        // CNAME table
+        String CNAMESchema = "CREATE TABLE ferret.cnames ("
+                + " apexDomain VARCHAR,"
+                + " domain VARCHAR,"
+                + " cname VARCHAR,"
+                + " PRIMARY KEY (apexDomain,domain,cname) );";
+
+        String CNAMEInsert = "INSERT INTO ferret.cnames (apexDomain,domain,cname) VALUES (?,?,?)";
+        String CNAMETable = "cnames";
+        String CNAMEOutputDir = outputDir + CNAMETable + "/";
+
+
+        // Subdomain table
+        String SubDomainSchema = "CREATE TABLE ferret.subdomains ("
+                + " domain VARCHAR,"
+                + " subdomain VARCHAR,"
+                + " PRIMARY KEY (domain) );";
+
+        String SubDomainInsert = "INSERT INTO ferret.subdomains (domain,subdomain) VALUES (?,?)";
+        String SubDomainTable = "subdomains";
+        String SubDomainOutputDir = outputDir + SubDomainTable + "/";
+
 
         File directory = new File(keyspace);
         if (!directory.exists())
             directory.mkdir();
 
-        File filePath = new File(directory, table);
-        if (!filePath.exists())
-            filePath.mkdir();
+        String[] paths = { RDNSTable, CNAMETable, SubDomainTable };
+        for (String path : paths) {
+            File filePath = new File(directory, path);
+            if (!filePath.exists())
+                filePath.mkdir();
+        }
 
-        this.writer = CQLSSTableWriter.builder()
+        String[] opaths = { RDNSOutputDir, CNAMEOutputDir, SubDomainOutputDir };
+        for (String path : opaths) {
+            File filePath = new File(path);
+            if (!filePath.exists())
+                filePath.mkdir();
+        }
+
+        this.RDNSWriter = CQLSSTableWriter.builder()
                 .withPartitioner(Murmur3Partitioner.instance)
-                .inDirectory(outputDir)
-                .forTable(schema)
-                .using(insert).build();
+                .inDirectory(RDNSOutputDir)
+                .forTable(RDNSSchema)
+                .using(RDNSInsert).build();
 
-        System.out.println("Writer created Successfully");
+        this.CNAMEWriter = CQLSSTableWriter.builder()
+                .withPartitioner(Murmur3Partitioner.instance)
+                .inDirectory(CNAMEOutputDir)
+                .forTable(CNAMESchema)
+                .using(CNAMEInsert).build();
+
+        this.SubDomainWriter = CQLSSTableWriter.builder()
+                .withPartitioner(Murmur3Partitioner.instance)
+                .inDirectory(SubDomainOutputDir)
+                .forTable(SubDomainSchema)
+                .using(SubDomainInsert).build();
+
+        System.out.println("Writer(s) created Successfully");
 
         File cityDatabase = new File("misc/geocity.mmdb");
         File asnDatabase = new File("misc/geoasn.mmdb");
@@ -150,7 +202,7 @@ public class App {
             this.MMDBCityReader = new DatabaseReader.Builder(cityDatabase).withCache(new CHMCache(262144)).build();
             this.MMDBASNReader = new DatabaseReader.Builder(asnDatabase).withCache(new CHMCache(262144)).build();
         } catch (IOException e) {
-            System.out.println("Error OPening MMDB :: " + e.toString());
+            System.out.println("Error Opening MMDB :: " + e.toString());
         }
     }
 
@@ -183,15 +235,15 @@ public class App {
             String asn = "";
             String as_name = "";
 
-
             InetAddress parsedIpAddress = null;
             InetAddress ip8 = null;
             InetAddress ip16 = null;
             InetAddress ip24 = null;
 
-            if (!recordType.equals("a")) {
+            Boolean isCNAME = !recordType.equals("a");
+
+            if (isCNAME) {
                 // Handle CNAME's properly
-                apexDomain = ipStr;
                 recordType = "CNAME";
                 ipStr = "0.0.0.0";
                 parsedIpAddress = App.zeroAddr;
@@ -227,11 +279,23 @@ public class App {
             }
 
             if (apexDomain != "" && apexDomain != null) {
-                this.writeRecord(apexDomain, recordType, subdomain, ip8, ip16, ip24,
-                        parsedIpAddress, country, city, asn, as_name, tld);
+
+                // if CNAME only add entry to cnames table and not to reverse RDNS table
+                if (isCNAME) {
+                    this.writeCNAMERecord(ipStr,apexDomain,subdomain);
+                } else {
+                    this.writeRDNSRecord(apexDomain, recordType, subdomain, ip8, ip16, ip24,
+                            parsedIpAddress, country, city, asn, as_name, tld);
+                }
+
+                // add a entry to subdomains table in all cases
+                this.writeSubDomainRecord(apexDomain, subdomain);
             } else {
                 System.out.println("ip or apexDomain empty!, ignoring record: <" + ipStr + ", " + apexDomain + ">");
             }
+
+
+            this.processedEntries++;
         }
 
     }
@@ -265,7 +329,9 @@ public class App {
         InetAddress ip16 = null;
         InetAddress ip24 = null;
 
-        if (!recordType.equals("A")) {
+        Boolean isCNAME = !recordType.equals("A");
+
+        if (isCNAME) {
             // Handle CNAME's properly
             apexDomain = ipStr;
             recordType = "CNAME";
@@ -309,26 +375,60 @@ public class App {
         }
 
         if (apexDomain != "" && apexDomain != null) {
-            this.writeRecord(apexDomain, recordType, domain, ip8, ip16, ip24,
-                    parsedIpAddress, country, city, asn, as_name, tld);
+                // if CNAME only add entry to cnames table and not to reverse RDNS table
+                if (isCNAME) {
+                    this.writeCNAMERecord(ipStr,apexDomain,domain);
+                } else {
+                    this.writeRDNSRecord(apexDomain, recordType, domain, ip8, ip16, ip24,
+                            parsedIpAddress, country, city, asn, as_name, tld);
+                }
+
+                // add a entry to subdomains table in all cases
+                this.writeSubDomainRecord(apexDomain, domain);
         } else {
             System.out.println("ip or apexDomain empty!, ignoring record: <" + ipStr + ", " + apexDomain + ">");
         }
 
     }
 
-    public void writeRecord(String apexDomain, String recordType, String subDomain, InetAddress ip8, InetAddress ip16,
+    public void writeRDNSRecord(String apexDomain, String recordType, String subDomain, InetAddress ip8,
+            InetAddress ip16,
             InetAddress ip24, InetAddress ipAddress,
             String country,
             String city, String asn, String as_name, String tld)
             throws IOException, SkippedEntryProcessingException {
         try {
-            this.writer.addRow(apexDomain, recordType, subDomain, ip8, ip16, ip24, ipAddress, country, city, asn,
+            this.RDNSWriter.addRow(apexDomain, recordType, subDomain, ip8, ip16, ip24, ipAddress, country, city, asn,
                     as_name, tld);
-            this.processedEntries++;
         } catch (InvalidRequestException ie) {
-            System.out.println("InvalidRequestException: faile to write entry <" + apexDomain + "," + recordType + ","
+            System.out.println("writeRDNSRecord - InvalidRequestException: faile to write entry <" + apexDomain + "," + recordType + ","
                     + subDomain + "," + ipAddress + ">");
+            ie.printStackTrace();
+            System.out.println("Continuing to process other entries...");
+            throw new SkippedEntryProcessingException("Skipped Entry Processing");
+        }
+    }
+
+    public void writeCNAMERecord(String apexDomain, String domain, String subDomain)
+            throws IOException, SkippedEntryProcessingException {
+        try {
+            this.CNAMEWriter.addRow(apexDomain, domain, subDomain);
+        } catch (InvalidRequestException ie) {
+            System.out.println("writeCNAMERecord - InvalidRequestException: faile to write entry <" + apexDomain + ","
+                    + domain + ","
+                    + subDomain + ">");
+            ie.printStackTrace();
+            System.out.println("Continuing to process other entries...");
+            throw new SkippedEntryProcessingException("Skipped Entry Processing");
+        }
+    }
+
+    public void writeSubDomainRecord(String domain, String subDomain)
+            throws IOException, SkippedEntryProcessingException {
+        try {
+            this.SubDomainWriter.addRow(domain,subDomain);
+        } catch (InvalidRequestException ie) {
+            System.out.println("InvalidRequestException: faile to write entry <" + domain + "," + subDomain + ">");
             ie.printStackTrace();
             System.out.println("Continuing to process other entries...");
             throw new SkippedEntryProcessingException("Skipped Entry Processing");
