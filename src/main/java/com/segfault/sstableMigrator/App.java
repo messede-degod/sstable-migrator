@@ -150,7 +150,7 @@ public class App {
         String SubDomainSchema = "CREATE TABLE ferret.subdomains ("
                 + " domain VARCHAR,"
                 + " subdomain VARCHAR,"
-                + " PRIMARY KEY (domain) );";
+                + " PRIMARY KEY (domain,subdomain) );";
 
         String SubDomainInsert = "INSERT INTO ferret.subdomains (domain,subdomain) VALUES (?,?)";
         String SubDomainTable = "subdomains";
