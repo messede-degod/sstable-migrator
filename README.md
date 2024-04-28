@@ -11,7 +11,7 @@
  - Create Keyspace - `CREATE KEYSPACE ferret WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'};`
  - Create RDNS Table - `CREATE TABLE ferret.dnsdata (apexDomain VARCHAR,recordType VARCHAR, subDomain VARCHAR, ip8 INET, ip16 INET, ip24 INET, ipAddress INET, country VARCHAR, city VARCHAR, asn VARCHAR, as_name VARCHAR, PRIMARY KEY (ip8,ip16,ip24,ipAddress,tld,apexDomain,subDomain) );`
  - Create SubDomains table - `CREATE TABLE ferret.subdomains ( domain VARCHAR, subdomain VARCHAR, PRIMARY KEY (domain,subdomain) );`
- - Create CNAME table - `CREATE TABLE ferret.cnames ( target VARCHAR, apexDomain VARCHAR, domain VARCHAR, PRIMARY KEY (apexDomain,domain,cname) );`
+ - Create CNAME table - `CREATE TABLE ferret.cnames ( target VARCHAR, apexDomain VARCHAR, domain VARCHAR, PRIMARY KEY (apexDomain,domain,domain) );`
  - Move Data - `sudo docker container exec -it cassandra  sstableloader -d 172.18.0.2 /ferret/dnsdata/`
 
 # Possible Improvements
