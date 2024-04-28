@@ -139,7 +139,7 @@ public class App {
                 + " target VARCHAR,"
                 + " apexDomain VARCHAR,"
                 + " domain VARCHAR,"
-                + " PRIMARY KEY (apexDomain,domain,domain) );";
+                + " PRIMARY KEY (target,apexDomain,domain) );";
 
         String CNAMEInsert = "INSERT INTO ferret.cnames (target,apexDomain,domain) VALUES (?,?,?)";
         String CNAMETable = "cnames";
