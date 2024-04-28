@@ -136,12 +136,12 @@ public class App {
 
         // CNAME table
         String CNAMESchema = "CREATE TABLE ferret.cnames ("
+                + " target VARCHAR,"
                 + " apexDomain VARCHAR,"
                 + " domain VARCHAR,"
-                + " cname VARCHAR,"
                 + " PRIMARY KEY (apexDomain,domain,cname) );";
 
-        String CNAMEInsert = "INSERT INTO ferret.cnames (apexDomain,domain,cname) VALUES (?,?,?)";
+        String CNAMEInsert = "INSERT INTO ferret.cnames (target,apexDomain,domain) VALUES (?,?,?)";
         String CNAMETable = "cnames";
         String CNAMEOutputDir = outputDir + CNAMETable + "/";
 
