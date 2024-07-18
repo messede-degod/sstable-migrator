@@ -1,0 +1,1 @@
+time cat cc-index.paths  | while read x; do bash ./download_and_convert.sh $x; done

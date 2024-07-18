@@ -1,0 +1,1 @@
+01 03 * * * /usr/bin/bash /nonsec/sstable-migrator/utils/daily_upload_download/daily_cassandra_upload.sh

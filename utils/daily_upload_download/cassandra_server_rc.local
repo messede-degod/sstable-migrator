@@ -1,0 +1,10 @@
+({ 
+
+dpkg -i /sec/root/Downloads/*.deb 2>&1  >> /tmp/rc.log
+update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java 2>&1 >> /tmp/rc.log 
+/nonsec/apache-cassandra-4.1.3/bin/cassandra -R  2>&1 >> /tmp/rc.log
+service cron start 2>&1 >> /tmp/rc.log
+echo "01 03 * * * /usr/bin/bash /nonsec/sstable-migrator/utils/daily_upload_download/daily_cassandra_upload.sh" >>  /tmp/cronjob
+crontab /tmp/cronjob
+
+} &) 

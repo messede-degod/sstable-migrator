@@ -1,1 +1,0 @@
-time cat cc-index.paths  | while read x; do bash ./utils/down.sh $x; done

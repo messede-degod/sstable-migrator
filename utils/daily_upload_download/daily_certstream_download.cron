@@ -1,0 +1,1 @@
+01 00 * * * /usr/bin/bash /root/dnsdata/make_domains.sh
