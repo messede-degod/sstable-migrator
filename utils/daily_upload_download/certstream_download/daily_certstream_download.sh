@@ -21,17 +21,32 @@ mkdir -p raw_certstream
 
 touch additional_domains.txt # list any additional domains that you want to process here
 
+
+#####################
+## STAGE 1  DOWNLOAD AND FORMAT
+#####################
+
 echo "[+] Downloading Domains List..."
-# Download daily dump
 
-/usr/bin/wget https://pub.ajam.dev/datasets/certstream/all_latest.txt -O all_latest.txt
+#################################
+# Download dump of last 24 hrs
+yesterday=$(date -d "1 day ago"  +%Y_%m_%d)
+/usr/bin/wget https://pub.ajam.dev/datasets/certstream/Temp/${yesterday}.7z -O all_latest.7z
+
+# Extract data
+/usr/bin/7z e -oarchive_out/  all_latest.7z
+rm all_latest.7z
+mv archive_out/${yesterday}.txt all_latest.txt
+##################################
+
+
+##################################
+# Download newly registered domains
 /usr/bin/wget https://pub.ajam.dev/datasets/certstream/nrd_latest.txt -O nrd_latest.txt
-
 mv nrd_latest.txt domains.txt
-
 cat additional_domains.txt >> domains.txt
 truncate -s 0 additional_domains.txt
-
+###################################
 rx='\.('
 rx+='gov\.[a-z]{2,}$|'
 rx+='gov$|'
@@ -54,12 +69,17 @@ mv a domains.txt
 echo "domains.txt" $(wc -l domains.txt)
 
 
-# duplicate entries from the last 7 days
-remove_last_20_days() {
+#####################
+## STAGE 2 - CLEANUP          
+#####################
+
+
+# Remove Duplicate entries from the last X days
+remove_last_x_days() {
 
     today=$(date +%Y-%m-%d)
 
-    for i in {20..1}; do
+    for i in $(eval echo {"$1"..1} ); do
         date=$(date -d "$i day ago" +%Y-%m-%d)
 
         if [ -e "domains/domains_$date.txt" ]; then
@@ -73,7 +93,13 @@ remove_last_20_days() {
 }
 
 
-remove_last_20_days
+remove_last_x_days 25
+
+## Remove Unwanted domains
+echo "[Remove Unwanted Domains] domains.txt before removal" $(wc -l domains.txt)
+grep -E -v -f unwanted-domains domains.txt > a
+mv a domains.txt
+echo "[Remove Unwanted Domains] domains.txt after removal" $(wc -l domains.txt)
 
 
 echo "[+] Starting Resolution..."
