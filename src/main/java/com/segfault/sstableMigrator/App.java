@@ -279,16 +279,17 @@ public class App {
 
             if (apexDomain != "" && apexDomain != null) {
 
-                // if CNAME only add entry to cnames table and not to reverse RDNS table
+                // if CNAME only add entry to cnames table and not to reverse RDNS or subdomain table
                 if (isCNAME) {
                     this.writeCNAMERecord(ipStr,apexDomain,subdomain);
                 } else {
                     this.writeRDNSRecord(apexDomain, recordType, subdomain, ip8, ip16, ip24,
                             parsedIpAddress, country, city, asn, as_name, tld);
+
+                    // add a entry to subdomains table
+                    this.writeSubDomainRecord(apexDomain, subdomain);
                 }
 
-                // add a entry to subdomains table in all cases
-                this.writeSubDomainRecord(apexDomain, subdomain);
             } else {
                 System.out.println("ip or apexDomain empty!, ignoring record: <" + ipStr + ", " + apexDomain + ">");
             }
@@ -373,16 +374,16 @@ public class App {
         }
 
         if (apexDomain != "" && apexDomain != null) {
-                // if CNAME only add entry to cnames table and not to reverse RDNS table
+                // if CNAME only add entry to cnames table and not to reverse RDNS table or subdomain table
                 if (isCNAME) {
                     this.writeCNAMERecord(ipStr,apexDomain,domain);
                 } else {
                     this.writeRDNSRecord(apexDomain, recordType, domain, ip8, ip16, ip24,
                             parsedIpAddress, country, city, asn, as_name, tld);
+                    
+                    // add a entry to subdomains table in all cases
+                    this.writeSubDomainRecord(apexDomain, domain);
                 }
-
-                // add a entry to subdomains table in all cases
-                this.writeSubDomainRecord(apexDomain, domain);
         } else {
             System.out.println("ip or apexDomain empty!, ignoring record: <" + ipStr + ", " + apexDomain + ">");
         }
