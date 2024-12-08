@@ -338,6 +338,8 @@ public class App {
             return;
         }
 
+        System.out.println(domain+" >> "+Data.toString());
+
         String apexDomain = Data.get(1).toString();
         String tld = Data.get(3).toString();
 
@@ -566,7 +568,7 @@ public class App {
         // Extract ApexDomain
         apexDomain.append(String.join(".", 
             ArrayUtils.subarray(parts, labelIndex, tldIndex + 1)
-        )).append("."); // tldIndex + 1 -> since end is exclusive
+        )); // tldIndex + 1 -> since end is exclusive
 
         returnData.add(apexDomain);
 
