@@ -1,4 +1,6 @@
 output/*
 input/*
+csv_input/*
+tmp/*
 ferret/
 target/*

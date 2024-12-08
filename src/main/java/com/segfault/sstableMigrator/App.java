@@ -20,6 +20,7 @@ import com.maxmind.geoip2.model.CityResponse;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -37,6 +38,8 @@ public class App {
     int lookedUpEntries = 0;
     static InetAddress zeroAddr = null;
 
+
+    // https://data.iana.org/TLD/tlds-alpha-by-domain.txt
     static Map<String, String> TLDs = new HashMap<String, String>() {
         {
         }
@@ -60,8 +63,8 @@ public class App {
         App.zeroAddr = InetAddress.getByName("0.0.0.0");
         App.readTLD();
 
-        // File directory = new File("csv_input/");
-        File directory = new File("input/");
+        File directory = new File("csv_input/");
+        // File directory = new File("input/");
 
         File[] files = directory.listFiles();
         System.out.println("Found: " + files.length + " files in input directory.");
@@ -72,8 +75,8 @@ public class App {
 
                 String line = reader.readLine();
                 while (line != null) {
-                    // csw.parseAndInsertCSV(line);
-                    csw.parseAndInsertJSON(line);
+                    csw.parseAndInsertCSV(line);
+                    // csw.parseAndInsertJSON(line);
                     line = reader.readLine();
                 }
 
@@ -145,17 +148,21 @@ public class App {
         String CNAMETable = "cnames";
         String CNAMEOutputDir = outputDir + CNAMETable + "/";
 
-
         // Subdomain table
         String SubDomainSchema = "CREATE TABLE ferret.subdomains ("
-                + " domain VARCHAR,"
-                + " subdomain VARCHAR,"
-                + " PRIMARY KEY (domain,subdomain) );";
+                + " p1 VARCHAR,"
+                + " p2 VARCHAR,"
+                + " p3 VARCHAR,"
+                + " p4 VARCHAR,"
+                + " p5 VARCHAR,"
+                + " p6 VARCHAR,"
+                + " p7 VARCHAR,"
+                + " lastSeen date,"
+                + " PRIMARY KEY ((p1,p2,p3),p4,p5,p6,p7) );";
 
-        String SubDomainInsert = "INSERT INTO ferret.subdomains (domain,subdomain) VALUES (?,?)";
+        String SubDomainInsert = "INSERT INTO ferret.subdomains (p1, p2, p3, p4, p5, p6, p7, lastSeen) VALUES (?,?,?,?,?,?,?,toDate(now()))";
         String SubDomainTable = "subdomains";
         String SubDomainOutputDir = outputDir + SubDomainTable + "/";
-
 
         File directory = new File(keyspace);
         if (!directory.exists())
@@ -222,11 +229,14 @@ public class App {
 
             String subdomain = ans.getString("name");
 
-            // find apexDomain and tld
-            String Data[] = App.getTLDAndApexDomain(subdomain);
-            String apexDomain = Data[1];
-            String tld = Data[0];
-            // --
+            ArrayList<Object> Data = App.getDomainParts(subdomain);
+            if (Data.get(0).equals(false)) {
+                System.out.println("Ignoring Record - getDomainParts failed : " + subdomain);
+                return;
+            }
+
+            String apexDomain = Data.get(1).toString();
+            String tld = Data.get(3).toString();
 
             String ipStr = ans.getString("data");
             String recordType = ans.getString("type");
@@ -281,19 +291,26 @@ public class App {
 
                 // if CNAME only add entry to cnames table and not to reverse RDNS or subdomain table
                 if (isCNAME) {
-                    this.writeCNAMERecord(ipStr,apexDomain,subdomain);
+                    this.writeCNAMERecord(ipStr, apexDomain, subdomain);
                 } else {
                     this.writeRDNSRecord(apexDomain, recordType, subdomain, ip8, ip16, ip24,
                             parsedIpAddress, country, city, asn, as_name, tld);
 
                     // add a entry to subdomains table
-                    this.writeSubDomainRecord(apexDomain, subdomain);
+                    this.writeSubDomainRecord(
+                        Data.get(2).toString(), 
+                        Data.get(3).toString(), 
+                        Data.get(4).toString(),
+                        Data.get(5).toString(),
+                        Data.get(6).toString(),
+                        Data.get(7).toString(),
+                        Data.get(8).toString()
+                    );
                 }
 
             } else {
                 System.out.println("ip or apexDomain empty!, ignoring record: <" + ipStr + ", " + apexDomain + ">");
             }
-
 
             this.processedEntries++;
         }
@@ -314,9 +331,15 @@ public class App {
         String recordType = dataParts[1];
         String domain = dataParts[0];
 
-        String Data[] = App.getTLDAndApexDomain(domain);
-        String apexDomain = Data[1];
-        String tld = Data[0];
+        ArrayList<Object> Data = App.getDomainParts(domain);
+
+        if (Data.get(0).equals(false)) {
+            System.out.println("Ignoring Record - getDomainParts failed : " + csvString);
+            return;
+        }
+
+        String apexDomain = Data.get(1).toString();
+        String tld = Data.get(3).toString();
 
         String country = "";
         String city = "";
@@ -374,16 +397,24 @@ public class App {
         }
 
         if (apexDomain != "" && apexDomain != null) {
-                // if CNAME only add entry to cnames table and not to reverse RDNS table or subdomain table
-                if (isCNAME) {
-                    this.writeCNAMERecord(ipStr,apexDomain,domain);
-                } else {
-                    this.writeRDNSRecord(apexDomain, recordType, domain, ip8, ip16, ip24,
-                            parsedIpAddress, country, city, asn, as_name, tld);
-                    
-                    // add a entry to subdomains table in all cases
-                    this.writeSubDomainRecord(apexDomain, domain);
-                }
+            // if CNAME only add entry to cnames table and not to reverse RDNS table or subdomain table
+            if (isCNAME) {
+                this.writeCNAMERecord(ipStr,apexDomain,domain);
+            } else {
+                this.writeRDNSRecord(apexDomain, recordType, domain, ip8, ip16, ip24,
+                        parsedIpAddress, country, city, asn, as_name, tld);
+
+                // add a entry to subdomains table in all cases
+                this.writeSubDomainRecord(
+                        Data.get(2).toString(), 
+                        Data.get(3).toString(), 
+                        Data.get(4).toString(),
+                        Data.get(5).toString(),
+                        Data.get(6).toString(),
+                        Data.get(7).toString(),
+                        Data.get(8).toString()
+                );
+            }
         } else {
             System.out.println("ip or apexDomain empty!, ignoring record: <" + ipStr + ", " + apexDomain + ">");
         }
@@ -422,12 +453,12 @@ public class App {
         }
     }
 
-    public void writeSubDomainRecord(String domain, String subDomain)
+    public void writeSubDomainRecord(String label, String tld, String p1, String p2, String p3, String p4, String p5)
             throws IOException, SkippedEntryProcessingException {
         try {
-            this.SubDomainWriter.addRow(domain,subDomain);
+            this.SubDomainWriter.addRow(label, tld, p1, p2, p3, p4, p5);
         } catch (InvalidRequestException ie) {
-            System.out.println("InvalidRequestException: faile to write entry <" + domain + "," + subDomain + ">");
+            System.out.println("InvalidRequestException: faile to write entry <" + label + "," + tld + ">");
             ie.printStackTrace();
             System.out.println("Continuing to process other entries...");
             throw new SkippedEntryProcessingException("Skipped Entry Processing");
@@ -491,6 +522,87 @@ public class App {
         }
 
         return new String[] { "", domain };
+    }
+
+    /*
+     * abc.bca.abc.co.com
+     *          |   |  |-> TLD
+     *          |   -----> Level 2 tld
+     *          ---------> Label
+     */
+
+    public static ArrayList<Object> getDomainParts(String domain) {
+        // success,apexDomain,label, tld, p1, p2, p3, p4, p5
+        ArrayList<Object> returnData = new ArrayList<Object>(9);
+
+        // split domain to parts sep: .
+        String parts[] = domain.split("\\.");
+        int tldIndex = parts.length - 1;
+        int l2TldIndex = tldIndex;
+        int labelIndex = 0;
+        boolean tldExists = tldIndex > 0;
+
+        if (!tldExists) {
+            returnData.add(false);
+            return returnData;
+        }
+
+        //
+        // output
+        StringBuilder apexDomain = new StringBuilder();
+        //
+        //
+
+        returnData.add(true);
+
+
+        // If level 2 tld exists
+        if (TLDs.get(parts[tldIndex - 1]) != null) {
+                l2TldIndex = tldIndex - 1;
+        }
+
+        labelIndex = Math.max(Math.min(tldIndex, l2TldIndex) - 1, 0);
+        
+        // Extract ApexDomain
+        apexDomain.append(String.join(".", 
+            ArrayUtils.subarray(parts, labelIndex, tldIndex + 1)
+        )).append("."); // tldIndex + 1 -> since end is exclusive
+
+        returnData.add(apexDomain);
+
+        int maxParts = 7;
+        int addedParts = 0;
+        int lastPartIndex = Math.max(tldIndex - 5,0);
+
+        // add tld
+        returnData.add(parts[tldIndex]);
+        addedParts++;
+
+        // add l2tld or empty string
+        if(l2TldIndex!=tldIndex){
+            returnData.add(parts[l2TldIndex]);
+        }else{
+            returnData.add("");            
+        }
+        addedParts++;
+
+        // add remaining parts
+        for (int i = tldIndex-2; i >= lastPartIndex; i--) {
+            addedParts++;
+            returnData.add(parts[i]);
+        }
+
+        if (lastPartIndex > 0) {
+            returnData.add(String.join(".", ArrayUtils.subarray(parts, 0, lastPartIndex)));
+            addedParts++;
+        }
+
+        // add dummy parts
+        for(int j=addedParts; j<maxParts; j++){
+            returnData.add("");
+        }
+
+        return returnData;
     }
 
 }
