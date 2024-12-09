@@ -38,7 +38,6 @@ public class App {
     int lookedUpEntries = 0;
     static InetAddress zeroAddr = null;
 
-
     // https://data.iana.org/TLD/tlds-alpha-by-domain.txt
     static Map<String, String> TLDs = new HashMap<String, String>() {
         {
@@ -289,7 +288,8 @@ public class App {
 
             if (apexDomain != "" && apexDomain != null) {
 
-                // if CNAME only add entry to cnames table and not to reverse RDNS or subdomain table
+                // if CNAME only add entry to cnames table and not to reverse RDNS or subdomain
+                // table
                 if (isCNAME) {
                     this.writeCNAMERecord(ipStr, apexDomain, subdomain);
                 } else {
@@ -298,14 +298,13 @@ public class App {
 
                     // add a entry to subdomains table
                     this.writeSubDomainRecord(
-                        Data.get(2).toString(), 
-                        Data.get(3).toString(), 
-                        Data.get(4).toString(),
-                        Data.get(5).toString(),
-                        Data.get(6).toString(),
-                        Data.get(7).toString(),
-                        Data.get(8).toString()
-                    );
+                            Data.get(2).toString(),
+                            Data.get(3).toString(),
+                            Data.get(4).toString(),
+                            Data.get(5).toString(),
+                            Data.get(6).toString(),
+                            Data.get(7).toString(),
+                            Data.get(8).toString());
                 }
 
             } else {
@@ -338,7 +337,6 @@ public class App {
             return;
         }
 
-        System.out.println(domain+" >> "+Data.toString());
 
         String apexDomain = Data.get(1).toString();
         String tld = Data.get(3).toString();
@@ -399,23 +397,23 @@ public class App {
         }
 
         if (apexDomain != "" && apexDomain != null) {
-            // if CNAME only add entry to cnames table and not to reverse RDNS table or subdomain table
+            // if CNAME only add entry to cnames table and not to reverse RDNS table or
+            // subdomain table
             if (isCNAME) {
-                this.writeCNAMERecord(ipStr,apexDomain,domain);
+                this.writeCNAMERecord(ipStr, apexDomain, domain);
             } else {
                 this.writeRDNSRecord(apexDomain, recordType, domain, ip8, ip16, ip24,
                         parsedIpAddress, country, city, asn, as_name, tld);
 
                 // add a entry to subdomains table in all cases
                 this.writeSubDomainRecord(
-                        Data.get(2).toString(), 
-                        Data.get(3).toString(), 
+                        Data.get(2).toString(),
+                        Data.get(3).toString(),
                         Data.get(4).toString(),
                         Data.get(5).toString(),
                         Data.get(6).toString(),
                         Data.get(7).toString(),
-                        Data.get(8).toString()
-                );
+                        Data.get(8).toString());
             }
         } else {
             System.out.println("ip or apexDomain empty!, ignoring record: <" + ipStr + ", " + apexDomain + ">");
@@ -433,7 +431,8 @@ public class App {
             this.RDNSWriter.addRow(apexDomain, recordType, subDomain, ip8, ip16, ip24, ipAddress, country, city, asn,
                     as_name, tld);
         } catch (InvalidRequestException ie) {
-            System.out.println("writeRDNSRecord - InvalidRequestException: faile to write entry <" + apexDomain + "," + recordType + ","
+            System.out.println("writeRDNSRecord - InvalidRequestException: faile to write entry <" + apexDomain + ","
+                    + recordType + ","
                     + subDomain + "," + ipAddress + ">");
             ie.printStackTrace();
             System.out.println("Continuing to process other entries...");
@@ -557,39 +556,39 @@ public class App {
 
         returnData.add(true);
 
-
         // If level 2 tld exists
         if (TLDs.get(parts[tldIndex - 1]) != null) {
-                l2TldIndex = tldIndex - 1;
+            l2TldIndex = tldIndex - 1;
         }
 
         labelIndex = Math.max(Math.min(tldIndex, l2TldIndex) - 1, 0);
-        
+
         // Extract ApexDomain
-        apexDomain.append(String.join(".", 
-            ArrayUtils.subarray(parts, labelIndex, tldIndex + 1)
-        )); // tldIndex + 1 -> since end is exclusive
+        apexDomain.append(String.join(".",
+                ArrayUtils.subarray(parts, labelIndex, tldIndex + 1))); // tldIndex + 1 -> since end is exclusive
 
         returnData.add(apexDomain);
 
         int maxParts = 7;
         int addedParts = 0;
-        int lastPartIndex = Math.max(tldIndex - 5,0);
+        int lastPartIndex = Math.max(tldIndex - 5, 0);
 
         // add tld
         returnData.add(parts[tldIndex]);
         addedParts++;
 
         // add l2tld or empty string
-        if(l2TldIndex!=tldIndex){
+        if (l2TldIndex != tldIndex) {
             returnData.add(parts[l2TldIndex]);
-        }else{
-            returnData.add("");            
+            returnData.add("");
+        } else {
+            returnData.add("");
+            returnData.add(parts[tldIndex-1]);
         }
-        addedParts++;
+        addedParts += 2;
 
         // add remaining parts
-        for (int i = tldIndex-2; i >= lastPartIndex; i--) {
+        for (int i = tldIndex - 2; i >= lastPartIndex; i--) {
             addedParts++;
             returnData.add(parts[i]);
         }
@@ -600,7 +599,7 @@ public class App {
         }
 
         // add dummy parts
-        for(int j=addedParts; j<maxParts; j++){
+        for (int j = addedParts; j < maxParts; j++) {
             returnData.add("");
         }
 
