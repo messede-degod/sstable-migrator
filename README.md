@@ -23,3 +23,7 @@
  -  <strike>use java FileChannel to read files (possible performance improvements)</strike> (no improvements observed)
  -  use fastjson parser
  -  <strike>use multithreaded writes to CQLSSTableWriter (https://issues.apache.org/jira/browse/CASSANDRA-7463)</strike> (bad idea, write performance is far better when keys are in order, writes with out of order keys take up a lot of cpu, but yield no improvement in conversion time)
+
+
+# TLD Source
+ - https://data.iana.org/TLD/tlds-alpha-by-domain.txt
