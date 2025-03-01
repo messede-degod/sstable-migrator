@@ -3,7 +3,7 @@
 # Building
  -  install and use **java 8**, check with `java -version`
  -  compile - `mvn compile`
- -  run - `mvn exec:java` to convert `input/*` to sstables in `/output`
+ -  run - `MAVEN_OPTS="-Xmx7114M" mvn exec:java -DargLine="-Xms6144m  -Xmx7144m"` to convert `input/*` to sstables in `/output`
 
 # Setup Cassandra
  - Start Container - `sudo docker run -v ./output/:/ferret/dnsdata  -d --name cassandra --hostname cassandra --network cassandra cassandra` (Allow upto a minute for bootup)
