@@ -1,0 +1,2 @@
+01 03 * * * /usr/bin/bash /nonsec/sstable-migrator/utils/daily_upload_download/daily_all_upload.sh
+01 04 * * * /usr/bin/bash /nonsec/sstable-migrator/utils/daily_upload_download/daily_subdomain_upload.sh

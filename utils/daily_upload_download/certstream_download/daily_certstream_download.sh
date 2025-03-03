@@ -41,9 +41,6 @@ mv archive_out/${yesterday}.txt all_latest.txt
 
 
 ##################################
-# Download newly registered domains
-/usr/bin/wget https://pub.ajam.dev/datasets/certstream/nrd_latest.txt -O nrd_latest.txt
-mv nrd_latest.txt domains.txt
 cat additional_domains.txt >> domains.txt
 truncate -s 0 additional_domains.txt
 ###################################
