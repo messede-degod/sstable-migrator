@@ -12,13 +12,16 @@ mv csv_input/* old_csv_input/ 2>/dev/null
 
 timestamp=$(date -d "2 day ago" +%Y-%m-%d)
 
-wget https://cs1.ip.thc.org/${timestamp}.txt -O csv_input/${timestamp}.txt
+wget https://cs1.ip.thc.org/${timestamp}.txt.gz -O csv_input/${timestamp}.txt.gz
 if [ $? -ne 0 ]; then
-    wget https://cs2.ip.thc.org/${timestamp}.txt -O csv_input/${timestamp}.txt
+    wget https://cs2.ip.thc.org/${timestamp}.txt -O csv_input/${timestamp}.txt.gz
     if [ $? -ne 0 ]; then
         exit 11
     fi
 fi
+
+# extract archive
+gzip -d csv_input/${timestamp}.txt.gz
 
 # remove unwanted domains
 grep -v -E -f unwanted-domains csv_input/${timestamp}.txt > sa
