@@ -107,9 +107,6 @@
           <version>1.2.1</version>
           <configuration>
             <mainClass>com.segfault.sstableMigrator.App</mainClass>
-            <arguments>
-              <argument>argument1</argument>
-            </arguments>
           </configuration>
         </plugin>
       </plugins>

@@ -56,7 +56,6 @@ public class App {
 
     public static void main(String[] args) throws IOException {
 
-        BufferedReader reader;
 
         App csw = new App();
         App.zeroAddr = InetAddress.getByName("0.0.0.0");
@@ -68,33 +67,28 @@ public class App {
         File[] files = directory.listFiles();
         System.out.println("Found: " + files.length + " files in input directory.");
 
-        for (File file : files) {
-            try {
-                reader = new BufferedReader(new FileReader(file));
 
-                String line = reader.readLine();
-                while (line != null) {
-                    csw.parseAndInsertCSV(line);
-                    // csw.parseAndInsertJSON(line);
-                    line = reader.readLine();
-                }
-
-                reader.close();
-
-            } catch (IOException e) {
-                System.out.println("During Processing of file: " + file);
-                e.printStackTrace();
-            } catch (SkippedEntryProcessingException e) {
-                System.out.println("During Processing of file: " + file);
-                e.printStackTrace();
-            }
-            csw.processedFiles += 1;
-
-            if (csw.processedFiles % 100 == 0) {
-                System.out.println("Processed " + csw.processedFiles + "/" + files.length + " files");
-            }
-
+        String FileType = "CSV";
+        if (args.length > 0) {
+            FileType = args[0];
         }
+
+        System.out.println("Input File Type is :"+FileType);
+
+
+        switch (FileType) {            
+            case "JSON":
+                csw.processJsonFiles(files);
+                break;
+            case "CSV_SUBD":
+                csw.processSubDomainCSVFiles(files);
+                break;                
+            case "CSV":                        
+            default:
+                csw.processCSVFiles(files);
+                break;
+        }
+
 
         System.out.println("Finished processing all files.");
 
@@ -211,6 +205,111 @@ public class App {
             System.out.println("Error Opening MMDB :: " + e.toString());
         }
     }
+
+    //
+    // //
+    //
+
+    public void processJsonFiles(File[] files){
+        BufferedReader reader;
+        
+        for (File file : files) {
+            try {
+                reader = new BufferedReader(new FileReader(file));
+
+                String line = reader.readLine();
+                while (line != null) {
+                    this.parseAndInsertJSON(line);
+                    line = reader.readLine();
+                }
+
+                reader.close();
+
+            } catch (IOException e) {
+                System.out.println("During Processing of file: " + file);
+                e.printStackTrace();
+            } catch (SkippedEntryProcessingException e) {
+                System.out.println("During Processing of file: " + file);
+                e.printStackTrace();
+            }
+            this.processedFiles += 1;
+
+            if (this.processedFiles % 100 == 0) {
+                System.out.println("Processed " + this.processedFiles + "/" + files.length + " files");
+            }
+
+        }
+
+    }
+
+    public void processCSVFiles(File[] files){
+        BufferedReader reader;
+        
+        for (File file : files) {
+            try {
+                reader = new BufferedReader(new FileReader(file));
+
+                String line = reader.readLine();
+                while (line != null) {
+                    this.parseAndInsertCSV(line);
+                    line = reader.readLine();
+                }
+
+                reader.close();
+
+            } catch (IOException e) {
+                System.out.println("During Processing of file: " + file);
+                e.printStackTrace();
+            } catch (SkippedEntryProcessingException e) {
+                System.out.println("During Processing of file: " + file);
+                e.printStackTrace();
+            }
+            this.processedFiles += 1;
+
+            if (this.processedFiles % 100 == 0) {
+                System.out.println("Processed " + this.processedFiles + "/" + files.length + " files");
+            }
+
+        }
+
+    }
+
+    public void processSubDomainCSVFiles(File[] files){
+        BufferedReader reader;
+        
+        for (File file : files) {
+            try {
+                reader = new BufferedReader(new FileReader(file));
+
+                String line = reader.readLine();
+                while (line != null) {
+                    this.parseAndInsertSubdomainCSV(line);
+                    line = reader.readLine();
+                }
+
+                reader.close();
+
+            } catch (IOException e) {
+                System.out.println("During Processing of file: " + file);
+                e.printStackTrace();
+            } catch (SkippedEntryProcessingException e) {
+                System.out.println("During Processing of file: " + file);
+                e.printStackTrace();
+            }
+            this.processedFiles += 1;
+
+            if (this.processedFiles % 100 == 0) {
+                System.out.println("Processed " + this.processedFiles + "/" + files.length + " files");
+            }
+
+        }
+
+    }
+
+
+    //
+    // //
+    //
 
     public void parseAndInsertJSON(String jsonString) throws IOException, SkippedEntryProcessingException {
         JSONObject jo = null;
@@ -418,8 +517,53 @@ public class App {
         } else {
             System.out.println("ip or apexDomain empty!, ignoring record: <" + ipStr + ", " + apexDomain + ">");
         }
+        this.processedEntries++;
 
     }
+
+    public void parseAndInsertSubdomainCSV(String csvString) throws IOException, SkippedEntryProcessingException {
+        String[] dataParts = csvString.split("\\,");
+
+        // Domain,RecordType,IP
+
+        if (dataParts.length < 1) {
+            System.out.println("Ignoring Partial Record: "+csvString);
+            return;
+        }
+
+        String domain = dataParts[0];
+
+        ArrayList<Object> Data = App.getDomainParts(domain);
+
+        if (Data.get(0).equals(false)) {
+            System.out.println("Ignoring Record - getDomainParts failed : " + csvString);
+            return;
+        }
+
+
+        String apexDomain = Data.get(1).toString();
+
+
+        if (apexDomain != "" && apexDomain != null) {
+                // add a entry to subdomains table in all cases
+                this.writeSubDomainRecord(
+                        Data.get(2).toString(),
+                        Data.get(3).toString(),
+                        Data.get(4).toString(),
+                        Data.get(5).toString(),
+                        Data.get(6).toString(),
+                        Data.get(7).toString(),
+                        Data.get(8).toString());
+        } else {
+            System.out.println("ip or apexDomain empty!, ignoring record: <" + apexDomain + ">");
+        }
+        this.processedEntries++;
+    }
+
+
+    //
+    // //
+    //
 
     public void writeRDNSRecord(String apexDomain, String recordType, String subDomain, InetAddress ip8,
             InetAddress ip16,
