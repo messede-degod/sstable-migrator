@@ -9,13 +9,57 @@
  - Start Container - `sudo docker run -v ./output/:/ferret/dnsdata  -d --name cassandra --hostname cassandra --network cassandra cassandra` (Allow upto a minute for bootup)
  - Start a cqlsh shell - `sudo docker exec -it cassandra cqlsh`
  
- - Create Keyspace - `CREATE KEYSPACE ferret WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'};`
+ - Create Keyspace 
+    ```
+    CREATE KEYSPACE ferret WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'};
+    ```
  
- - Create RDNS Table - `CREATE TABLE ferret.dnsdata (apexDomain VARCHAR,recordType VARCHAR, subDomain VARCHAR, ip8 INET, ip16 INET, ip24 INET, ipAddress INET, country VARCHAR, city VARCHAR, asn VARCHAR, as_name VARCHAR, PRIMARY KEY (ip8,ip16,ip24,ipAddress,tld,apexDomain,subDomain) );`
+ - Create RDNS Table
+    ```
+    CREATE TABLE ferret.rdnsv4 (
+        ip8 INET,
+        ip16 INET,
+        ip24 INET,
+        ipAddress INET,
+        p1 VARCHAR,
+        p2 VARCHAR,
+        p3 VARCHAR,
+        p4 VARCHAR,
+        p5 VARCHAR,
+        p6 VARCHAR,
+        p7 VARCHAR,
+        country VARCHAR,
+        city VARCHAR,
+        asn INT,
+        as_name VARCHAR,
+        PRIMARY KEY (ip8, ip16, ip24, ipAddress, p1, p2, p3, p4, p5, p6, p7)
+    );
+    ```
 
- - Create SubDomains table - `CREATE TABLE ferret.subdomains ( p1 VARCHAR, p2 VARCHAR, p3 VARCHAR, p4 VARCHAR, p5 VARCHAR, p6 VARCHAR, p7 VARCHAR, lastSeen date, PRIMARY KEY ((p1,p2,p3),p4,p5,p6,p7));`
+ - Create SubDomains table - 
+    ```
+    CREATE TABLE ferret.subdomains (
+        p1 VARCHAR, 
+        p2 VARCHAR, 
+        p3 VARCHAR, 
+        p4 VARCHAR, 
+        p5 VARCHAR, 
+        p6 VARCHAR, 
+        p7 VARCHAR, 
+        lastSeen date, 
+        PRIMARY KEY ((p1, p2, p3), p4, p5, p6, p7)
+    );
+    ```
 
- - Create CNAME table - `CREATE TABLE ferret.cnames ( target VARCHAR, apexDomain VARCHAR, domain VARCHAR, PRIMARY KEY (target,apexDomain,domain) );`
+ - Create CNAME table - 
+    ```
+    CREATE TABLE ferret.cnames (
+        target VARCHAR, 
+        apexDomain VARCHAR, 
+        domain VARCHAR, 
+        PRIMARY KEY (target, apexDomain, domain)
+    );
+    ```
  
  - Move Data - `sudo docker container exec -it cassandra  sstableloader -d 172.18.0.2 /ferret/dnsdata/`
 
