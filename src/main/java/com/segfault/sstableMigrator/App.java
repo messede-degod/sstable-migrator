@@ -34,6 +34,8 @@ public class App {
     int processedFiles = 0;
     int lookedUpEntries = 0;
     static InetAddress zeroAddr = null;
+    static String FileType = "CSV";
+    static String DataSource = "CERTSTREAM";
 
     // https://data.iana.org/TLD/tlds-alpha-by-domain.txt
     static Map<String, String> TLDs = new HashMap<String, String>() {
@@ -64,14 +66,22 @@ public class App {
                 "Found: " + files.length + " files in input directory."
         );
 
-        String FileType = "CSV";
-        if (args.length > 0) {
-            FileType = args[0];
+        //
+        // //
+        if (args.length < 2) {
+            System.out.println("Argument 1: FileType and Argument 2: Source, must be provided");
+            return;
         }
 
-        System.out.println("Input File Type is :" + FileType);
+        App.FileType = args[0];
+        App.DataSource = args[1];
+        // //
+        //
 
-        switch (FileType) {
+        System.out.println("Input File Type is :" + App.FileType);
+        System.out.println("Data Source is :" + App.DataSource);
+
+        switch (App.FileType) {
             case "CSV_SUBD":
                 csw.processSubDomainCSVFiles(files);
                 break;
@@ -103,6 +113,7 @@ public class App {
         // RDNS table
         String RDNSSchema
                 = "CREATE TABLE ferret.rdnsv4 ("
+                //
                 + " ip8 INET,"
                 + " ip16 INET,"
                 + " ip24 INET,"
@@ -120,16 +131,25 @@ public class App {
                 + " city  VARCHAR,"
                 + " asn   INT,"
                 + " as_name VARCHAR,"
+                //
+                + " source VARCHAR,"
+                + " sourceRecordType VARCHAR,"
+                + " firstSeen timestamp,"
+                + " lastSeen timestamp,"
+                + " updatedAt timestamp,"
+                //
                 + " PRIMARY KEY (ip8, ip16, ip24, ipAddress, p1, p2, p3, p4, p5, p6, p7) );";
 
         String RDNSInsert
                 = "INSERT INTO ferret.rdnsv4 ("
-                + "ip8, ip16, ip24, ipAddress,"
-                + "p1, p2, p3, p4, p5, p6, p7,"
-                + "country, city, asn, as_name)"
+                + " ip8, ip16, ip24, ipAddress,"
+                + " p1, p2, p3, p4, p5, p6, p7,"
+                + " country, city, asn, as_name,"
+                + " source, sourceRecordType, lastSeen, updatedAt)"
                 + "VALUES (?, ?, ?, ?,"
-                + "?, ?, ?, ?, ?, ?, ?,"
-                + "?, ?, ?, ?)";
+                + " ?, ?, ?, ?, ?, ?, ?,"
+                + " ?, ?, ?, ?,"
+                + " ?, ?, toTimestamp(now()), toTimestamp(now()))";
 
         String RDNSTable = "rdnsv4";
         String RDNSOutputDir = outputDir + RDNSTable + "/";
@@ -140,10 +160,19 @@ public class App {
                 + " target VARCHAR,"
                 + " apexDomain VARCHAR,"
                 + " domain VARCHAR,"
+                //
+                + " source VARCHAR,"
+                + " firstSeen timestamp,"
+                + " lastSeen timestamp,"
+                + " updatedAt timestamp,"
+                //
                 + " PRIMARY KEY (target,apexDomain,domain) );";
 
         String CNAMEInsert
-                = "INSERT INTO ferret.cnames (target,apexDomain,domain) VALUES (?,?,?)";
+                = "INSERT INTO ferret.cnames (target,apexDomain,domain,"
+                + " source,lastSeen,updatedAt)"
+                + "VALUES (?,?,?,"
+                + " ?, toTimestamp(now()), toTimestamp(now()))";
         String CNAMETable = "cnames";
         String CNAMEOutputDir = outputDir + CNAMETable + "/";
 
@@ -157,11 +186,22 @@ public class App {
                 + " p5 VARCHAR,"
                 + " p6 VARCHAR,"
                 + " p7 VARCHAR,"
-                + " lastSeen date,"
+                //
+                + "source VARCHAR,"
+                + "sourceRecordType VARCHAR,"
+                + "firstSeen timestamp,"
+                + "lastSeen timestamp,"
+                + "updatedAt timestamp,"
+                //
                 + " PRIMARY KEY ((p1,p2,p3),p4,p5,p6,p7) );";
 
         String SubDomainInsert
-                = "INSERT INTO ferret.subdomains (p1, p2, p3, p4, p5, p6, p7, lastSeen) VALUES (?,?,?,?,?,?,?,toDate(now()))";
+                = "INSERT INTO ferret.subdomains ("
+                + " p1, p2, p3, p4, p5, p6, p7,"
+                + " source, sourceRecordType, lastSeen, updatedAt)"
+                + "VALUES (?,?,?,?,?,?,?,"
+                + " ?, ?, toTimestamp(now()), toTimestamp(now()))";
+
         String SubDomainTable = "subdomains";
         String SubDomainOutputDir = outputDir + SubDomainTable + "/";
 
@@ -386,7 +426,7 @@ public class App {
         // if CNAME, only add entry to cnames table and not to reverse RDNS table or
         // subdomain table
         if (isCNAME) {
-            this.writeCNAMERecord(ipStr, apexDomain, domain);
+            this.writeCNAMERecord(ipStr, apexDomain, domain, App.DataSource);
         } else {
             this.writeRDNSRecord(
                     ip8,
@@ -403,7 +443,9 @@ public class App {
                     country,
                     city,
                     asn,
-                    as_name
+                    as_name,
+                    App.DataSource,
+                    recordType
             );
 
             // add a entry to subdomains table in all cases
@@ -414,7 +456,9 @@ public class App {
                     Data.get(5).toString(),
                     Data.get(6).toString(),
                     Data.get(7).toString(),
-                    Data.get(8).toString()
+                    Data.get(8).toString(),
+                    App.DataSource,
+                    recordType
             );
         }
     }
@@ -456,7 +500,9 @@ public class App {
                 Data.get(5).toString(),
                 Data.get(6).toString(),
                 Data.get(7).toString(),
-                Data.get(8).toString()
+                Data.get(8).toString(),
+                App.DataSource,
+                "NOT_RESOLVED"
         );
     }
 
@@ -480,7 +526,10 @@ public class App {
             String country,
             String city,
             int asn,
-            String as_name
+            String as_name,
+            //
+            String source,
+            String sourceRecordType
     ) throws IOException, SkippedEntryProcessingException {
         try {
             this.RDNSWriter.addRow(
@@ -488,6 +537,7 @@ public class App {
                     ip16,
                     ip24,
                     ipAddress,
+                    //
                     p1,
                     p2,
                     p3,
@@ -495,10 +545,14 @@ public class App {
                     p5,
                     p6,
                     p7,
+                    //
                     country,
                     city,
                     asn,
-                    as_name
+                    as_name,
+                    //
+                    source,
+                    sourceRecordType
             );
         } catch (InvalidRequestException ie) {
             System.out.println(
@@ -518,10 +572,12 @@ public class App {
     public void writeCNAMERecord(
             String apexDomain,
             String domain,
-            String subDomain
+            String subDomain,
+            //
+            String source
     ) throws IOException, SkippedEntryProcessingException {
         try {
-            this.CNAMEWriter.addRow(apexDomain, domain, subDomain);
+            this.CNAMEWriter.addRow(apexDomain, domain, subDomain, source);
         } catch (InvalidRequestException ie) {
             System.out.println(
                     "writeCNAMERecord - InvalidRequestException: faile to write entry <"
@@ -547,10 +603,23 @@ public class App {
             String p2,
             String p3,
             String p4,
-            String p5
+            String p5,
+            //
+            String source,
+            String sourceRecordType
     ) throws IOException, SkippedEntryProcessingException {
         try {
-            this.SubDomainWriter.addRow(label, tld, p1, p2, p3, p4, p5);
+            this.SubDomainWriter.addRow(
+                    label,
+                    tld,
+                    p1,
+                    p2,
+                    p3,
+                    p4,
+                    p5,
+                    source,
+                    sourceRecordType
+            );
         } catch (InvalidRequestException ie) {
             System.out.println(
                     "InvalidRequestException: faile to write entry <"

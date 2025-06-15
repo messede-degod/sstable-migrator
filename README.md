@@ -32,6 +32,11 @@
         city VARCHAR,
         asn INT,
         as_name VARCHAR,
+        source VARCHAR,
+        sourceRecordType VARCHAR,
+        firstSeen timestamp,
+        lastSeen timestamp,
+        updatedAt timestamp,
         PRIMARY KEY (ip8, ip16, ip24, ipAddress, p1, p2, p3, p4, p5, p6, p7)
     );
     ```
@@ -46,7 +51,11 @@
         p5 VARCHAR, 
         p6 VARCHAR, 
         p7 VARCHAR, 
-        lastSeen date, 
+        source VARCHAR,
+        sourceRecordType VARCHAR,
+        firstSeen timestamp,
+        lastSeen timestamp,
+        updatedAt timestamp,
         PRIMARY KEY ((p1, p2, p3), p4, p5, p6, p7)
     );
     ```
@@ -56,7 +65,11 @@
     CREATE TABLE ferret.cnames (
         target VARCHAR, 
         apexDomain VARCHAR, 
-        domain VARCHAR, 
+        domain VARCHAR,
+        source VARCHAR,
+        firstSeen timestamp,
+        lastSeen timestamp,
+        updatedAt timestamp,
         PRIMARY KEY (target, apexDomain, domain)
     );
     ```
