@@ -719,6 +719,9 @@ public class App {
         // success,apexDomain,label, tld, p1, p2, p3, p4, p5
         ArrayList<Object> returnData = new ArrayList<>(9);
 
+        // convert to lower case, i,e GoOgLe.cOm is same as google.com
+        domain = domain.toLowerCase();
+
         // split domain to parts sep: .
         String parts[] = domain.split("\\.");
         int tldIndex = parts.length - 1;
