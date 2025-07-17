@@ -4,3 +4,4 @@ csv_input/*
 tmp/*
 ferret/
 target/*
+cleaner/cleaner
