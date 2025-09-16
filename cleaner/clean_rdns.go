@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -53,10 +54,14 @@ func validateAndReturnRDNS(line string) ValidationResult {
 	}
 
 	if !isValidDomain(parts[1]) {
-		return ValidationResult{
-			isValid: false,
-			output:  fmt.Sprintf("ED,%s", line),
+		cleanedDom, cerr := AttemptDomainCleanUp(parts[1])
+		if cerr != nil {
+			return ValidationResult{
+				isValid: false,
+				output:  fmt.Sprintf("ED,%s", line),
+			}
 		}
+		parts[1] = cleanedDom
 	}
 
 	return ValidationResult{
@@ -64,6 +69,9 @@ func validateAndReturnRDNS(line string) ValidationResult {
 		output:  fmt.Sprintf("%s,%s", parts[0], parts[1]),
 	}
 }
+
+var ErrorDomainTooShort = errors.New("Error Too Short")
+var ErrorDomainCleanUpFailed = errors.New("Failed To Cleanup")
 
 func cleanRDNS() {
 	cleanAndOutputLine(500, validateAndReturnRDNS)

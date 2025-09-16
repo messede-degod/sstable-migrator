@@ -203,3 +203,18 @@ func getApexDomain(domain string) string {
 
 	return apexDomain.String()
 }
+
+func AttemptDomainCleanUp(domain string) (string, error) {
+	if len(domain) <= 2 {
+		return domain, ErrorDomainTooShort
+	}
+
+	if domain[:2] == `\"` || domain[:2] == `*.` {
+		cleanDom := domain[2:]
+		if isValidDomain(cleanDom) {
+			return cleanDom, nil
+		}
+	}
+
+	return domain, ErrorDomainCleanUpFailed
+}
