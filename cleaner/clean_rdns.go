@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-func validateAndReturnRDNS(line string) ValidationResult {
+func validateAndReturnRDNSV1(line string) ValidationResult {
 	parts := strings.Split(line, ",")
 
 	parts[1] = stripDot(parts[1])
@@ -36,6 +36,32 @@ func validateAndReturnRDNS(line string) ValidationResult {
 	return ValidationResult{
 		isValid: true,
 		output:  fmt.Sprintf("%s,%s,%s", parts[0], parts[2], parts[3]),
+	}
+}
+
+func validateAndReturnRDNS(line string) ValidationResult {
+	parts := strings.Split(line, ",")
+
+	parts[0] = stripDot(parts[0]) // IP
+	parts[1] = stripDot(parts[1]) // Domain
+
+	if len(parts) != 2 {
+		return ValidationResult{
+			isValid: false,
+			output:  fmt.Sprintf("EL,%s", line),
+		}
+	}
+
+	if !isValidDomain(parts[1]) {
+		return ValidationResult{
+			isValid: false,
+			output:  fmt.Sprintf("ED,%s", line),
+		}
+	}
+
+	return ValidationResult{
+		isValid: true,
+		output:  fmt.Sprintf("%s,%s", parts[0], parts[1]),
 	}
 }
 
