@@ -4,6 +4,7 @@ import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.io.sstable.CQLSSTableWriter;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.validator.routines.DomainValidator;
 import org.json.JSONObject;
 import org.json.JSONArray;
 
@@ -37,6 +38,7 @@ public class App {
     int processedFiles = 0;
     int lookedUpEntries = 0;
     static InetAddress zeroAddr = null;
+    static DomainValidator domainValidator = DomainValidator.getInstance();
 
     // https://data.iana.org/TLD/tlds-alpha-by-domain.txt
     static Map<String, String> TLDs = new HashMap<String, String>() {
@@ -56,7 +58,6 @@ public class App {
 
     public static void main(String[] args) throws IOException {
 
-
         App csw = new App();
         App.zeroAddr = InetAddress.getByName("0.0.0.0");
         App.readTLD();
@@ -67,28 +68,25 @@ public class App {
         File[] files = directory.listFiles();
         System.out.println("Found: " + files.length + " files in input directory.");
 
-
         String FileType = "CSV";
         if (args.length > 0) {
             FileType = args[0];
         }
 
-        System.out.println("Input File Type is :"+FileType);
+        System.out.println("Input File Type is :" + FileType);
 
-
-        switch (FileType) {            
+        switch (FileType) {
             case "JSON":
                 csw.processJsonFiles(files);
                 break;
             case "CSV_SUBD":
                 csw.processSubDomainCSVFiles(files);
-                break;                
-            case "CSV":                        
+                break;
+            case "CSV":
             default:
                 csw.processCSVFiles(files);
                 break;
         }
-
 
         System.out.println("Finished processing all files.");
 
@@ -158,21 +156,24 @@ public class App {
         String SubDomainOutputDir = outputDir + SubDomainTable + "/";
 
         File directory = new File(keyspace);
-        if (!directory.exists())
+        if (!directory.exists()) {
             directory.mkdir();
-
-        String[] paths = { RDNSTable, CNAMETable, SubDomainTable };
-        for (String path : paths) {
-            File filePath = new File(directory, path);
-            if (!filePath.exists())
-                filePath.mkdir();
         }
 
-        String[] opaths = { RDNSOutputDir, CNAMEOutputDir, SubDomainOutputDir };
+        String[] paths = {RDNSTable, CNAMETable, SubDomainTable};
+        for (String path : paths) {
+            File filePath = new File(directory, path);
+            if (!filePath.exists()) {
+                filePath.mkdir();
+            }
+        }
+
+        String[] opaths = {RDNSOutputDir, CNAMEOutputDir, SubDomainOutputDir};
         for (String path : opaths) {
             File filePath = new File(path);
-            if (!filePath.exists())
+            if (!filePath.exists()) {
                 filePath.mkdir();
+            }
         }
 
         this.RDNSWriter = CQLSSTableWriter.builder()
@@ -209,10 +210,9 @@ public class App {
     //
     // //
     //
-
-    public void processJsonFiles(File[] files){
+    public void processJsonFiles(File[] files) {
         BufferedReader reader;
-        
+
         for (File file : files) {
             try {
                 reader = new BufferedReader(new FileReader(file));
@@ -242,9 +242,9 @@ public class App {
 
     }
 
-    public void processCSVFiles(File[] files){
+    public void processCSVFiles(File[] files) {
         BufferedReader reader;
-        
+
         for (File file : files) {
             try {
                 reader = new BufferedReader(new FileReader(file));
@@ -274,9 +274,9 @@ public class App {
 
     }
 
-    public void processSubDomainCSVFiles(File[] files){
+    public void processSubDomainCSVFiles(File[] files) {
         BufferedReader reader;
-        
+
         for (File file : files) {
             try {
                 reader = new BufferedReader(new FileReader(file));
@@ -306,11 +306,9 @@ public class App {
 
     }
 
-
     //
     // //
     //
-
     public void parseAndInsertJSON(String jsonString) throws IOException, SkippedEntryProcessingException {
         JSONObject jo = null;
         try {
@@ -419,7 +417,6 @@ public class App {
         String[] dataParts = csvString.split("\\,");
 
         // Domain,RecordType,IP
-
         if (dataParts.length < 3) {
             // System.out.println("Ignoring Partial Record: "+csvString);
             return;
@@ -429,13 +426,24 @@ public class App {
         String recordType = dataParts[1];
         String domain = dataParts[0];
 
+        if (!domainValidator.isValid(domain)) {
+            try {
+                domain = App.attemptDomainCleanUp(domain);
+            } catch (IllegalArgumentException e) {
+                System.out.println(
+                        "ignoring invalid domain: " + domain
+                );
+            }
+
+            return;
+        }
+
         ArrayList<Object> Data = App.getDomainParts(domain);
 
         if (Data.get(0).equals(false)) {
             System.out.println("Ignoring Record - getDomainParts failed : " + csvString);
             return;
         }
-
 
         String apexDomain = Data.get(1).toString();
         String tld = Data.get(3).toString();
@@ -525,13 +533,24 @@ public class App {
         String[] dataParts = csvString.split("\\,");
 
         // Domain,RecordType,IP
-
         if (dataParts.length < 1) {
-            System.out.println("Ignoring Partial Record: "+csvString);
+            System.out.println("Ignoring Partial Record: " + csvString);
             return;
         }
 
         String domain = dataParts[0];
+
+        if (!domainValidator.isValid(domain)) {
+            try {
+                domain = App.attemptDomainCleanUp(domain);
+            } catch (IllegalArgumentException e) {
+                System.out.println(
+                        "ignoring invalid domain: " + domain
+                );
+            }
+
+            return;
+        }
 
         ArrayList<Object> Data = App.getDomainParts(domain);
 
@@ -540,31 +559,27 @@ public class App {
             return;
         }
 
-
         String apexDomain = Data.get(1).toString();
 
-
         if (apexDomain != "" && apexDomain != null) {
-                // add a entry to subdomains table in all cases
-                this.writeSubDomainRecord(
-                        Data.get(2).toString(),
-                        Data.get(3).toString(),
-                        Data.get(4).toString(),
-                        Data.get(5).toString(),
-                        Data.get(6).toString(),
-                        Data.get(7).toString(),
-                        Data.get(8).toString());
+            // add a entry to subdomains table in all cases
+            this.writeSubDomainRecord(
+                    Data.get(2).toString(),
+                    Data.get(3).toString(),
+                    Data.get(4).toString(),
+                    Data.get(5).toString(),
+                    Data.get(6).toString(),
+                    Data.get(7).toString(),
+                    Data.get(8).toString());
         } else {
             System.out.println("ip or apexDomain empty!, ignoring record: <" + apexDomain + ">");
         }
         this.processedEntries++;
     }
 
-
     //
     // //
     //
-
     public void writeRDNSRecord(String apexDomain, String recordType, String subDomain, InetAddress ip8,
             InetAddress ip16,
             InetAddress ip24, InetAddress ipAddress,
@@ -611,6 +626,7 @@ public class App {
     }
 
     public class SkippedEntryProcessingException extends Exception {
+
         public SkippedEntryProcessingException(String errorMessage) {
             super(errorMessage);
         }
@@ -620,19 +636,19 @@ public class App {
         byte[] addressBytes = ipAddress.getAddress();
         int mask = (0xFFFFFFFF << (32 - prefixLength)) & 0xFFFFFFFF;
 
-        int networkAddress = (addressBytes[0] & 0xFF) << 24 |
-                (addressBytes[1] & 0xFF) << 16 |
-                (addressBytes[2] & 0xFF) << 8 |
-                (addressBytes[3] & 0xFF);
+        int networkAddress = (addressBytes[0] & 0xFF) << 24
+                | (addressBytes[1] & 0xFF) << 16
+                | (addressBytes[2] & 0xFF) << 8
+                | (addressBytes[3] & 0xFF);
 
         int maskedNetworkAddress = networkAddress & mask;
 
         try {
-            byte[] maskedAddressBytes = new byte[] {
-                    (byte) ((maskedNetworkAddress >> 24) & 0xFF),
-                    (byte) ((maskedNetworkAddress >> 16) & 0xFF),
-                    (byte) ((maskedNetworkAddress >> 8) & 0xFF),
-                    (byte) (maskedNetworkAddress & 0xFF)
+            byte[] maskedAddressBytes = new byte[]{
+                (byte) ((maskedNetworkAddress >> 24) & 0xFF),
+                (byte) ((maskedNetworkAddress >> 16) & 0xFF),
+                (byte) ((maskedNetworkAddress >> 8) & 0xFF),
+                (byte) (maskedNetworkAddress & 0xFF)
             };
             return InetAddress.getByAddress(maskedAddressBytes);
         } catch (Exception e) {
@@ -651,7 +667,6 @@ public class App {
 
             // abc.co.de }---> already extracted as tld
             // \/----> we must check for second level tld
-
             if (TLDs.get(parts[tldIndex - 1]) == null) { // not a tld
                 apexDomain.append(String.join(".", ArrayUtils.subarray(parts, tldIndex - 1, tldIndex + 1)));
             } else { // is a tld
@@ -663,10 +678,10 @@ public class App {
             }
             apexDomain.append(".");
 
-            return new String[] { parts[tldIndex], apexDomain.toString() };
+            return new String[]{parts[tldIndex], apexDomain.toString()};
         }
 
-        return new String[] { "", domain };
+        return new String[]{"", domain};
     }
 
     /*
@@ -675,7 +690,6 @@ public class App {
      *          |   -----> Level 2 tld
      *          ---------> Label
      */
-
     public static ArrayList<Object> getDomainParts(String domain) {
         // success,apexDomain,label, tld, p1, p2, p3, p4, p5
         ArrayList<Object> returnData = new ArrayList<Object>(9);
@@ -730,7 +744,7 @@ public class App {
             returnData.add("");
         } else {
             returnData.add("");
-            returnData.add(parts[tldIndex-1]);
+            returnData.add(parts[tldIndex - 1]);
         }
         addedParts += 2;
 
@@ -753,4 +767,19 @@ public class App {
         return returnData;
     }
 
+    public static String attemptDomainCleanUp(String domain) {
+        if (domain.length() <= 2) {
+            throw new IllegalArgumentException("Domain is too short");
+        }
+
+        if (domain.startsWith("\\\"") || domain.startsWith("*.")) {
+            String cleanDom = domain.substring(2);
+            if (domainValidator.isValid(cleanDom)) {
+                System.out.println("cleaned up " + cleanDom);
+                return cleanDom;
+            }
+        }
+
+        throw new IllegalArgumentException("Domain clean up failed");
+    }
 }
