@@ -14,6 +14,7 @@ import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.io.sstable.CQLSSTableWriter;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.validator.routines.DomainValidator;
 
 import com.maxmind.db.CHMCache;
 import com.maxmind.geoip2.DatabaseReader;
@@ -36,6 +37,7 @@ public class App {
     static InetAddress zeroAddr = null;
     static String FileType = "CSV";
     static String DataSource = "CERTSTREAM";
+    static DomainValidator domainValidator = DomainValidator.getInstance();
 
     // https://data.iana.org/TLD/tlds-alpha-by-domain.txt
     static Map<String, String> TLDs = new HashMap<String, String>() {
@@ -350,6 +352,18 @@ public class App {
         String recordType = dataParts[1];
         String domain = dataParts[0];
 
+        if (!domainValidator.isValid(domain)) {
+            try {
+                domain = App.attemptDomainCleanUp(domain);
+            } catch (IllegalArgumentException e) {
+                System.out.println(
+                        "ignoring invalid domain: " + domain
+                );
+            }
+
+            return;
+        }
+
         ArrayList<Object> Data = App.getDomainParts(domain);
 
         if (Data.get(0).equals(false)) {
@@ -474,6 +488,18 @@ public class App {
         }
 
         String domain = dataParts[0];
+
+        if (!domainValidator.isValid(domain)) {
+            try {
+                domain = App.attemptDomainCleanUp(domain);
+            } catch (IllegalArgumentException e) {
+                System.out.println(
+                        "ignoring invalid domain: " + domain
+                );
+            }
+
+            return;
+        }
 
         ArrayList<Object> Data = App.getDomainParts(domain);
 
@@ -796,5 +822,21 @@ public class App {
         }
 
         return returnData;
+    }
+
+    public static String attemptDomainCleanUp(String domain) {
+        if (domain.length() <= 2) {
+            throw new IllegalArgumentException("Domain is too short");
+        }
+
+        if (domain.startsWith("\\\"") || domain.startsWith("*.")) {
+            String cleanDom = domain.substring(2);
+            if (domainValidator.isValid(cleanDom)) {
+                System.out.println("cleaned up " + cleanDom);
+                return cleanDom;
+            }
+        }
+
+        throw new IllegalArgumentException("Domain clean up failed");
     }
 }
