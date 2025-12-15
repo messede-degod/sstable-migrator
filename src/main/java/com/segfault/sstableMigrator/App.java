@@ -332,7 +332,7 @@ public class App {
             }
 
             String apexDomain = Data.get(1).toString();
-            String tld = Data.get(3).toString();
+            String tld = Data.get(2).toString();
 
             String ipStr = ans.getString("data");
             String recordType = ans.getString("type");
@@ -446,7 +446,7 @@ public class App {
         }
 
         String apexDomain = Data.get(1).toString();
-        String tld = Data.get(3).toString();
+        String tld = Data.get(2).toString();
 
         String country = "";
         String city = "";
